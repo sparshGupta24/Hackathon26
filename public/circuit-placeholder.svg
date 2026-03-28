@@ -1,0 +1,30 @@
+<svg width="1400" height="880" viewBox="0 0 1400 880" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1400" height="880" fill="#08090D"/>
+  <g opacity="0.22" stroke="#253149" stroke-width="1.4">
+    <path d="M0 110H1400"/>
+    <path d="M0 220H1400"/>
+    <path d="M0 330H1400"/>
+    <path d="M0 440H1400"/>
+    <path d="M0 550H1400"/>
+    <path d="M0 660H1400"/>
+    <path d="M0 770H1400"/>
+  </g>
+  <path
+    d="M186 426C186 304 266 210 376 210H562C640 210 704 264 722 338C737 399 776 430 846 430H991C1106 430 1200 520 1200 635C1200 742 1114 828 1008 828H776C707 828 648 784 633 718C618 653 566 610 501 610H322C246 610 186 545 186 470V426Z"
+    stroke="#FFFFFF"
+    stroke-width="46"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+  <path
+    d="M186 426C186 304 266 210 376 210H562C640 210 704 264 722 338C737 399 776 430 846 430H991C1106 430 1200 520 1200 635C1200 742 1114 828 1008 828H776C707 828 648 784 633 718C618 653 566 610 501 610H322C246 610 186 545 186 470V426Z"
+    stroke="#AFC5E4"
+    stroke-width="12"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+  <circle cx="268" cy="526" r="15" fill="#FF3D3D"/>
+  <rect x="246" y="478" width="14" height="92" fill="#FFFFFF"/>
+  <rect x="262" y="478" width="14" height="92" fill="#08090D"/>
+  <text x="86" y="808" fill="#FFFFFF" font-family="sans-serif" font-size="32" font-weight="700">Custom Grand Prix Circuit</text>
+</svg>
