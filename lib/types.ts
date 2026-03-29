@@ -1,13 +1,25 @@
+/** Roster entry from Firestore `people` collection (public API shape). */
+export interface PersonPublic {
+  id: string;
+  name: string;
+  photoUrl: string;
+}
+
 export type TimerStatus = "idle" | "running" | "ended";
 
 export interface PlayerState {
   id: string;
   name: string;
   slot: number;
+  /** Copied from the people corpus at registration time for display. */
+  photoUrl?: string;
+  /** Fixed role title when registered with the five-role form (e.g. Gunners). */
+  roleTitle?: string;
 }
 
 export interface LiveryState {
-  preset: string;
+  /** Selected `car_svg##` body (e.g. `"01"` … `"07"`). */
+  carTemplate: string;
   primaryColor: string;
   secondaryColor: string;
   tertiaryColor: string;

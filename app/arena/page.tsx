@@ -69,7 +69,7 @@ const EVENT_STAGES: ArenaStage[] = [
 ];
 
 export default function ArenaPage() {
-  const { data } = useEventState(true, 2000);
+  const { data } = useEventState(true);
   const [stageIndex, setStageIndex] = useState(0);
   const [phase, setPhase] = useState<"stage_text" | "stage_start" | "running" | "paused" | "ended">(
     EVENT_STAGES[0].kind === "timed" ? "stage_start" : "stage_text"

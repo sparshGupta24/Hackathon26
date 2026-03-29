@@ -1,25 +1,27 @@
 import { z } from "zod";
-import { LIVERY_PRESETS, MAX_PLAYERS, MIN_PLAYERS } from "@/lib/constants";
+import { CAR_TEMPLATE_IDS } from "@/lib/carSvgs";
+import { MAX_PLAYERS, MIN_PLAYERS } from "@/lib/constants";
 
 const hexColorRegex = /^#[0-9A-Fa-f]{6}$/;
 
-const playerNameSchema = z.string().trim().min(1, "Player name is required").max(40, "Player name is too long");
+const personIdSchema = z.string().trim().min(1, "Choose a player from the list");
 
-export const registrationSchema = z.object({
-  teamName: z.string().trim().min(2, "Team name is required").max(60, "Team name is too long"),
-  players: z.array(playerNameSchema).min(MIN_PLAYERS).max(MAX_PLAYERS),
-  livery: z.object({
-    preset: z.enum(LIVERY_PRESETS),
-    primaryColor: z.string().regex(hexColorRegex, "Invalid primary color"),
-    secondaryColor: z.string().regex(hexColorRegex, "Invalid secondary color"),
-    tertiaryColor: z.string().regex(hexColorRegex, "Invalid tertiary color"),
-    carNumber: z.number().int().min(1).max(99)
+export const registrationSchema = z
+  .object({
+    teamName: z.string().trim().min(2, "Team name is required").max(60, "Team name is too long"),
+    playerIds: z.array(personIdSchema).min(MIN_PLAYERS).max(MAX_PLAYERS),
+    livery: z.object({
+      carTemplate: z.enum(CAR_TEMPLATE_IDS),
+      primaryColor: z.string().regex(hexColorRegex, "Invalid primary color"),
+      secondaryColor: z.string().regex(hexColorRegex, "Invalid secondary color"),
+      tertiaryColor: z.string().regex(hexColorRegex, "Invalid tertiary color"),
+      carNumber: z.number().int().min(1).max(99)
+    })
   })
-});
-
-export const loginSchema = z.object({
-  passcode: z.string().min(1)
-});
+  .refine((data) => new Set(data.playerIds).size === data.playerIds.length, {
+    message: "Each role must be filled by a different person",
+    path: ["playerIds"]
+  });
 
 export const timerExtendSchema = z.object({
   minutes: z.union([z.literal(5), z.literal(10)])

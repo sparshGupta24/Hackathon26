@@ -9,13 +9,12 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev",
-    "prisma:studio": "prisma studio",
-    "db:init": "sqlite3 prisma/dev.db < prisma/init.sql"
+    "migrate:sqlite": "node scripts/migrate-sqlite-to-firestore.mjs",
+    "delete:teams": "node --import ./scripts/load-env.mjs scripts/delete-all-teams.mjs",
+    "seed:dummy-players": "node --import ./scripts/load-env.mjs scripts/seed-dummy-people.mjs"
   },
   "dependencies": {
-    "@prisma/client": "^6.17.0",
+    "firebase-admin": "^13.7.0",
     "next": "^16.0.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
@@ -25,10 +24,11 @@
     "@types/node": "^24.7.2",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
+    "better-sqlite3": "^12.8.0",
     "eslint": "^9.37.0",
     "eslint-config-next": "^16.0.1",
-    "prisma": "^6.17.0",
     "typescript": "^5.9.3",
+    "vite": "^6.4.1",
     "vitest": "^3.2.4"
   }
 }

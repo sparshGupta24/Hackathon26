@@ -1,60 +1,105 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import type { FormEvent } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { CircuitMapModal } from "@/components/CircuitMapModal";
 import { TeamCards } from "@/components/TeamCards";
 import { TimerCard } from "@/components/TimerCard";
 import { TEAM_LIMIT } from "@/lib/constants";
+import type { PersonPublic } from "@/lib/types";
 import { useEventState } from "@/lib/useEventState";
 
 export default function AdminPage() {
-  const [authState, setAuthState] = useState<"checking" | "authenticated" | "unauthenticated">("checking");
-  const [passcode, setPasscode] = useState("");
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [actionBusy, setActionBusy] = useState(false);
   const [teamMessages, setTeamMessages] = useState<Record<string, string>>({});
 
-  const { data, loading, error, refresh } = useEventState(authState === "authenticated", 2000);
+  const [roster, setRoster] = useState<PersonPublic[]>([]);
+  const [rosterLoading, setRosterLoading] = useState(true);
+  const [rosterMessage, setRosterMessage] = useState<string | null>(null);
+  const [rosterBusy, setRosterBusy] = useState(false);
+  const [newPersonName, setNewPersonName] = useState("");
+  const [newPersonPhoto, setNewPersonPhoto] = useState<File | null>(null);
 
-  useEffect(() => {
-    async function checkSession() {
-      try {
-        const response = await fetch("/api/admin/me", { cache: "no-store" });
-        const payload = (await response.json()) as { authenticated: boolean };
-        setAuthState(payload.authenticated ? "authenticated" : "unauthenticated");
-      } catch {
-        setAuthState("unauthenticated");
+  const { data, loading, error, refresh } = useEventState(true);
+
+  const loadRoster = useCallback(async () => {
+    try {
+      const response = await fetch("/api/people", { cache: "no-store" });
+      if (!response.ok) {
+        throw new Error("Unable to load roster");
       }
+      const payload = (await response.json()) as PersonPublic[];
+      setRoster(payload);
+    } catch {
+      setRoster([]);
     }
-
-    void checkSession();
   }, []);
 
-  async function submitLogin(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setActionMessage(null);
-    setActionBusy(true);
+  useEffect(() => {
+    void loadRoster().finally(() => {
+      setRosterLoading(false);
+    });
+  }, [loadRoster]);
 
+  async function addPersonToRoster(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setRosterMessage(null);
+    const name = newPersonName.trim();
+    if (!name) {
+      setRosterMessage("Enter a display name.");
+      return;
+    }
+    if (!newPersonPhoto) {
+      setRosterMessage("Choose a photo (PNG, JPEG, or WebP).");
+      return;
+    }
+
+    setRosterBusy(true);
     try {
-      const response = await fetch("/api/admin/login", {
+      const formData = new FormData();
+      formData.append("name", name);
+      formData.append("photo", newPersonPhoto);
+      const response = await fetch("/api/admin/people", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ passcode })
+        body: formData
       });
       const payload = (await response.json()) as { error?: string };
       if (!response.ok) {
-        throw new Error(payload.error ?? "Login failed");
+        throw new Error(payload.error ?? "Could not add player");
       }
-
-      setAuthState("authenticated");
-      setPasscode("");
-      setActionMessage("Volunteer access granted.");
-      await refresh();
-    } catch (loginError) {
-      setActionMessage(loginError instanceof Error ? loginError.message : "Unable to login.");
+      setNewPersonName("");
+      setNewPersonPhoto(null);
+      (event.target as HTMLFormElement).reset();
+      setRosterMessage("Player added to roster.");
+      await loadRoster();
+    } catch (err) {
+      setRosterMessage(err instanceof Error ? err.message : "Could not add player.");
     } finally {
-      setActionBusy(false);
+      setRosterBusy(false);
+    }
+  }
+
+  async function removePersonFromRoster(id: string) {
+    setRosterMessage(null);
+    setRosterBusy(true);
+    try {
+      const response = await fetch("/api/admin/people", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id })
+      });
+      const payload = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Could not remove player");
+      }
+      setRosterMessage("Player removed.");
+      await loadRoster();
+    } catch (err) {
+      setRosterMessage(err instanceof Error ? err.message : "Could not remove player.");
+    } finally {
+      setRosterBusy(false);
     }
   }
 
@@ -71,10 +116,6 @@ export default function AdminPage() {
 
       const payload = (await response.json()) as { error?: string };
       if (!response.ok) {
-        if (response.status === 401) {
-          setAuthState("unauthenticated");
-          throw new Error("Session expired. Login again.");
-        }
         throw new Error(payload.error ?? "Action failed");
       }
 
@@ -102,10 +143,6 @@ export default function AdminPage() {
       });
       const payload = (await response.json()) as { error?: string };
       if (!response.ok) {
-        if (response.status === 401) {
-          setAuthState("unauthenticated");
-          throw new Error("Session expired. Login again.");
-        }
         throw new Error(payload.error ?? "Unable to update team progress");
       }
       setActionMessage("Team progress updated.");
@@ -115,37 +152,6 @@ export default function AdminPage() {
     } finally {
       setActionBusy(false);
     }
-  }
-
-  if (authState === "checking") {
-    return <main className="page-shell"><p className="panel">Checking volunteer session...</p></main>;
-  }
-
-  if (authState === "unauthenticated") {
-    return (
-      <main className="page-shell">
-        <section className="panel auth-panel">
-          <p className="kicker">Volunteer Console</p>
-          <h1>Enter Passcode</h1>
-          <form onSubmit={submitLogin} className="form-grid">
-            <label>
-              Shared Passcode
-              <input
-                type="password"
-                value={passcode}
-                onChange={(event) => setPasscode(event.target.value)}
-                placeholder="Enter passcode"
-                required
-              />
-            </label>
-            <button className="btn-primary" type="submit" disabled={actionBusy}>
-              {actionBusy ? "Authenticating..." : "Unlock Dashboard"}
-            </button>
-          </form>
-          {actionMessage ? <p className="feedback">{actionMessage}</p> : null}
-        </section>
-      </main>
-    );
   }
 
   return (
@@ -194,6 +200,69 @@ export default function AdminPage() {
               </button>
             </div>
           </TimerCard>
+
+          <section className="panel">
+            <div className="section-head">
+              <h2>Player roster</h2>
+              <span className="pill idle">{roster.length} in corpus</span>
+            </div>
+            <p className="muted small">
+              Add people with a photo and name. Teams on the public page pick only from this list. Photos go to Firebase
+              Storage when possible (the app tries both default bucket names). If Storage is unavailable, images under ~720KB
+              are stored on the Firestore document instead; the emulator always uses inline storage.
+            </p>
+            <form className="admin-people-add" onSubmit={(e) => void addPersonToRoster(e)}>
+              <label>
+                Display name
+                <input
+                  type="text"
+                  maxLength={80}
+                  value={newPersonName}
+                  onChange={(e) => setNewPersonName(e.target.value)}
+                  placeholder="e.g. Alex Rivera"
+                  disabled={rosterBusy}
+                />
+              </label>
+              <label>
+                Photo
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  onChange={(e) => setNewPersonPhoto(e.target.files?.[0] ?? null)}
+                  disabled={rosterBusy}
+                />
+              </label>
+              <button className="btn-primary" type="submit" disabled={rosterBusy}>
+                {rosterBusy ? "Saving…" : "Add to roster"}
+              </button>
+            </form>
+            {rosterMessage ? <p className="feedback small">{rosterMessage}</p> : null}
+            {rosterLoading ? (
+              <p className="muted small">Loading roster…</p>
+            ) : roster.length === 0 ? (
+              <p className="muted small">No players yet. Add the first one above.</p>
+            ) : (
+              <div className="admin-people-list">
+                {roster.map((person) => (
+                  <div key={person.id} className="admin-people-row">
+                    <div className="admin-people-row-info">
+                      {/* eslint-disable-next-line @next/next/no-img-element -- signed URLs / data URLs */}
+                      <img src={person.photoUrl} alt="" className="admin-people-thumb" width={44} height={44} />
+                      <span>{person.name}</span>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn-link"
+                      onClick={() => void removePersonFromRoster(person.id)}
+                      disabled={rosterBusy}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
 
           <section className="panel">
             <div className="section-head">

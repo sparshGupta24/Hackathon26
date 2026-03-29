@@ -1,16 +1,13 @@
 export const TEAM_LIMIT = 6;
-export const MIN_PLAYERS = 1;
+/** Five fixed pit-lane roles; registration requires one roster player per role. */
+export const MIN_PLAYERS = 5;
 export const MAX_PLAYERS = 5;
-export const DEFAULT_BASE_DURATION_SEC = 60;
 
-export const LIVERY_PRESETS = [
-  "Velocity",
-  "Apex",
-  "Overtake",
-  "Storm",
-  "Nitro",
-  "Zenith"
+export const TEAM_ROLES = [
+  { title: "Gunners", subtitle: "Drive Directions" },
+  { title: "Jack Operators", subtitle: "Take the product to the next level" },
+  { title: "Wing Adjusters", subtitle: "Highlight opportunities" },
+  { title: "Stabilizers", subtitle: "Maintain quality in the product" },
+  { title: "Lollipop Man", subtitle: "Release Authority" }
 ] as const;
-
-export const SESSION_COOKIE_NAME = "volunteer_session";
-export const SESSION_MAX_AGE_SEC = 60 * 60 * 12;
+export const DEFAULT_BASE_DURATION_SEC = 60;

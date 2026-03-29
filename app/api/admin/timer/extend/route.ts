@@ -1,15 +1,10 @@
-import { NextResponse, type NextRequest } from "next/server";
-import { isAuthenticatedRequest } from "@/lib/auth";
-import { badRequest, serverError, unauthorized } from "@/lib/http";
-import { prisma } from "@/lib/prisma";
+import { NextResponse } from "next/server";
+import { badRequest, serverError } from "@/lib/http";
 import { timerExtendSchema } from "@/lib/schemas";
 import { getEventState } from "@/lib/state";
+import { extendTimerWhileRunning } from "@/lib/firestore/store";
 
-export async function POST(request: NextRequest) {
-  if (!isAuthenticatedRequest(request)) {
-    return unauthorized();
-  }
-
+export async function POST(request: Request) {
   const payload = await request.json().catch(() => null);
   const parsed = timerExtendSchema.safeParse(payload);
   if (!parsed.success) {
@@ -17,20 +12,10 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const timer = await prisma.eventTimer.findUnique({ where: { id: 1 } });
-    if (!timer || timer.status !== "running") {
+    const ok = await extendTimerWhileRunning(parsed.data.minutes);
+    if (!ok) {
       return badRequest("Timer is not running");
     }
-
-    await prisma.eventTimer.update({
-      where: { id: 1 },
-      data: {
-        extendedSec: {
-          increment: parsed.data.minutes * 60
-        }
-      }
-    });
-
     const state = await getEventState();
     return NextResponse.json({ ok: true, state });
   } catch (error) {

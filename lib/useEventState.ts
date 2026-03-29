@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { EventStateResponse } from "@/lib/types";
 
-export function useEventState(enabled = true, pollIntervalMs = 2000) {
+export function useEventState(enabled = true, pollIntervalMs = 10_000) {
   const [data, setData] = useState<EventStateResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

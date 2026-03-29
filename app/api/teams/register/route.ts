@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
-import { TEAM_LIMIT } from "@/lib/constants";
 import { badRequest, serverError } from "@/lib/http";
-import { prisma } from "@/lib/prisma";
 import { registrationSchema } from "@/lib/schemas";
 import { getEventState } from "@/lib/state";
+import { registerTeam } from "@/lib/firestore/store";
 
 function normalizeRegistrationPayload(payload: unknown) {
   if (!payload || typeof payload !== "object") {
@@ -12,16 +11,16 @@ function normalizeRegistrationPayload(payload: unknown) {
 
   const input = payload as {
     teamName?: unknown;
-    players?: unknown;
+    playerIds?: unknown;
     livery?: unknown;
   };
 
   return {
     ...input,
     teamName: typeof input.teamName === "string" ? input.teamName.trim() : input.teamName,
-    players: Array.isArray(input.players)
-      ? input.players.map((player) => (typeof player === "string" ? player.trim() : player)).filter(Boolean)
-      : input.players
+    playerIds: Array.isArray(input.playerIds)
+      ? input.playerIds.map((id) => (typeof id === "string" ? id.trim() : "")).filter(Boolean)
+      : input.playerIds
   };
 }
 
@@ -34,32 +33,10 @@ export async function POST(request: Request) {
       return badRequest(parsed.error.issues[0]?.message ?? "Invalid registration payload");
     }
 
-    await prisma.$transaction(async (tx) => {
-      const totalTeams = await tx.team.count();
-      if (totalTeams >= TEAM_LIMIT) {
-        throw new Error("TEAM_LIMIT_REACHED");
-      }
-
-      await tx.team.create({
-        data: {
-          name: parsed.data.teamName,
-          players: {
-            create: parsed.data.players.map((name, index) => ({
-              name,
-              slot: index + 1
-            }))
-          },
-          livery: {
-            create: {
-              preset: parsed.data.livery.preset,
-              primaryColor: parsed.data.livery.primaryColor,
-              secondaryColor: parsed.data.livery.secondaryColor,
-              tertiaryColor: parsed.data.livery.tertiaryColor,
-              carNumber: parsed.data.livery.carNumber
-            }
-          }
-        }
-      });
+    await registerTeam({
+      teamName: parsed.data.teamName,
+      playerIds: parsed.data.playerIds,
+      livery: parsed.data.livery
     });
 
     const state = await getEventState();
@@ -67,6 +44,9 @@ export async function POST(request: Request) {
   } catch (error) {
     if (error instanceof Error && error.message === "TEAM_LIMIT_REACHED") {
       return badRequest("Registration is closed. Six teams have already registered.");
+    }
+    if (error instanceof Error && error.message.startsWith("PERSON_NOT_FOUND")) {
+      return badRequest("One or more selected players are no longer available. Refresh and pick again.");
     }
 
     console.error("Failed to register team", error);

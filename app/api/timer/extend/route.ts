@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { serverError } from "@/lib/http";
-import { prisma } from "@/lib/prisma";
 import { getEventState } from "@/lib/state";
+import { publicExtendTimerBase } from "@/lib/firestore/store";
 
 export async function POST(request: Request) {
   try {
@@ -11,22 +11,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "minutes must be 5 or 10" }, { status: 400 });
     }
 
-    await prisma.eventTimer.upsert({
-      where: { id: 1 },
-      update: {
-        baseDurationSec: {
-          increment: minutes * 60
-        }
-      },
-      create: {
-        id: 1,
-        status: "idle",
-        startedAt: null,
-        baseDurationSec: minutes * 60,
-        extendedSec: 0
-      }
-    });
-
+    await publicExtendTimerBase(minutes);
     const state = await getEventState();
     return NextResponse.json({ ok: true, state });
   } catch (error) {

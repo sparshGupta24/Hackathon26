@@ -1,13 +1,25 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { LiveryHexBuckets } from "@/lib/carSvgs";
+import { recolorRasterByOccurrence } from "@/lib/rasterLivery";
+
+const RASTER_NUMBER_STYLE = {
+  leftPct: 52,
+  topPct: 42
+} as const;
+
+/** Extra downward offset for the car number (CSS px; works for SVG + raster overlays). */
+const CAR_NUMBER_OFFSET_Y_PX = 50;
+
+/** Second (smaller) number is placed this many px above the main overlay. */
+const CAR_NUMBER_UPPER_GAP_PX = 300;
 
 interface F1CarPreviewProps {
+  templatePath: string;
+  hexBuckets: LiveryHexBuckets;
   primaryColor: string;
   secondaryColor: string;
   tertiaryColor: string;
   carNumber: number;
-  sponsorAsset?: string | null;
-  sponsorPrimaryColor?: string;
-  sponsorSecondaryColor?: string;
 }
 
 function applyColorToNamedLayers(svg: string, prefix: string, color: string) {
@@ -43,185 +55,125 @@ function applyColorByExistingFills(svg: string, colors: string[], target: string
   return next;
 }
 
-function injectCarNumber(svg: string, carNumber: number) {
-  const safeNumber = String(carNumber).replace(/[^0-9]/g, "");
-  if (!safeNumber) {
-    return svg;
-  }
-
-  const numberText = `
-  <text
-    x="52%"
-    y="58%"
-    text-anchor="middle"
-    dominant-baseline="middle"
-    font-family="var(--font-heading), sans-serif"
-    font-size="42"
-    font-weight="700"
-    fill="#F9FAFC"
-    stroke="#0A0A0A"
-    stroke-width="3"
-    paint-order="stroke fill"
-    letter-spacing="1.2"
-  >${safeNumber}</text>`;
-
-  if (svg.includes("</svg>")) {
-    return svg.replace("</svg>", `${numberText}\n</svg>`);
-  }
-
-  return svg;
-}
-
-function stripSvgOuterTag(svg: string) {
-  const openTagMatch = svg.match(/<svg[^>]*>/i);
-  if (!openTagMatch) {
-    return { inner: svg, viewBox: "0 0 100 100" };
-  }
-  const openTag = openTagMatch[0];
-  const viewBoxMatch = openTag.match(/viewBox="([^"]+)"/i);
-  const widthMatch = openTag.match(/width="([^"]+)"/i);
-  const heightMatch = openTag.match(/height="([^"]+)"/i);
-
-  let viewBox = viewBoxMatch?.[1] ?? "0 0 100 100";
-  if (!viewBoxMatch && widthMatch && heightMatch) {
-    const width = Number.parseFloat(widthMatch[1]);
-    const height = Number.parseFloat(heightMatch[1]);
-    if (Number.isFinite(width) && Number.isFinite(height)) {
-      viewBox = `0 0 ${width} ${height}`;
-    }
-  }
-
-  const withoutOpen = svg.replace(/<svg[^>]*>/i, "");
-  const inner = withoutOpen.replace(/<\/svg>\s*$/i, "");
-  return { inner, viewBox };
-}
-
-function recolorSponsorSvg(svg: string, primary: string, secondary: string) {
-  const palette = new Set<string>();
-  const fillMatches = [...svg.matchAll(/fill="([^"]+)"/gi)];
-  const strokeMatches = [...svg.matchAll(/stroke="([^"]+)"/gi)];
-
-  for (const match of [...fillMatches, ...strokeMatches]) {
-    const color = match[1].trim();
-    const lower = color.toLowerCase();
-    if (lower === "none" || lower === "black" || lower === "white" || lower === "currentcolor") {
-      continue;
-    }
-    if (lower.startsWith("url(")) {
-      continue;
-    }
-    palette.add(color);
-  }
-
-  const colors = [...palette];
-  if (!colors.length) {
-    return svg;
-  }
-
-  let next = svg;
-  const first = colors[0];
-  const second = colors[1] ?? colors[0];
-  next = applyColorByExistingFills(next, [first], primary);
-  next = applyColorByExistingFills(next, [second], secondary);
-  return next;
-}
-
-function injectSponsor(svg: string, sponsorRawSvg: string | null, sponsorPrimary: string, sponsorSecondary: string) {
-  if (!sponsorRawSvg) {
-    return svg;
-  }
-
-  const recolored = recolorSponsorSvg(sponsorRawSvg, sponsorPrimary, sponsorSecondary);
-  const { inner, viewBox } = stripSvgOuterTag(recolored);
-  const values = viewBox.split(/\s+/).map((item) => Number.parseFloat(item));
-  const vbWidth = Number.isFinite(values[2]) ? values[2] : 100;
-  const vbHeight = Number.isFinite(values[3]) ? values[3] : 100;
-
-  // Replace the logo panel region (same dimensions as car logo area).
-  const logoX = 163.638;
-  const logoY = 58.446;
-  const targetWidth = 63.709;
-  const targetHeight = 32.342;
-  const scale = Math.min(targetWidth / vbWidth, targetHeight / vbHeight);
-  const renderedWidth = vbWidth * scale;
-  const renderedHeight = vbHeight * scale;
-  const x = logoX + (targetWidth - renderedWidth) / 2;
-  const y = logoY + (targetHeight - renderedHeight) / 2;
-
-  const sponsorGroup = `
-  <rect x="${logoX}" y="${logoY}" width="${targetWidth}" height="${targetHeight}" rx="3" fill="#242424" />
-  <g transform="translate(${x} ${y}) scale(${scale})">
-    ${inner}
-  </g>`;
-
-  if (svg.includes("</svg>")) {
-    return svg.replace("</svg>", `${sponsorGroup}\n</svg>`);
-  }
-
-  return svg;
+function isPngMagic(buffer: ArrayBuffer): boolean {
+  const u8 = new Uint8Array(buffer);
+  return u8.length >= 8 && u8[0] === 0x89 && u8[1] === 0x50 && u8[2] === 0x4e && u8[3] === 0x47;
 }
 
 export function F1CarPreview({
+  templatePath,
+  hexBuckets,
   primaryColor,
   secondaryColor,
   tertiaryColor,
-  carNumber,
-  sponsorAsset,
-  sponsorPrimaryColor = "#F7F8FB",
-  sponsorSecondaryColor = "#FF4C4C"
+  carNumber
 }: F1CarPreviewProps) {
   const [svgSource, setSvgSource] = useState<string | null>(null);
-  const [sponsorSource, setSponsorSource] = useState<string | null>(null);
+  const [rasterUrl, setRasterUrl] = useState<string | null>(null);
+  const rasterUrlRef = useRef<string | null>(null);
+  const [processedRasterUrl, setProcessedRasterUrl] = useState<string | null>(null);
+  const processedRasterRef = useRef<string | null>(null);
 
   useEffect(() => {
     let active = true;
-    async function loadSvg() {
+    const prevUrl = rasterUrlRef.current;
+    if (prevUrl) {
+      URL.revokeObjectURL(prevUrl);
+      rasterUrlRef.current = null;
+    }
+
+    async function loadTemplate() {
       try {
-        const response = await fetch("/f1car2.svg", { cache: "no-store" });
-        const rawSvg = await response.text();
-        if (active) {
+        const response = await fetch(templatePath, { cache: "no-store" });
+        const buf = await response.arrayBuffer();
+        if (!active) {
+          return;
+        }
+        if (isPngMagic(buf)) {
+          const blob = new Blob([buf], { type: "image/png" });
+          const url = URL.createObjectURL(blob);
+          rasterUrlRef.current = url;
+          setRasterUrl(url);
+          setSvgSource(null);
+        } else {
+          const rawSvg = new TextDecoder().decode(buf);
           setSvgSource(rawSvg);
+          setRasterUrl(null);
         }
       } catch {
         if (active) {
           setSvgSource(null);
+          setRasterUrl(null);
         }
       }
     }
-    void loadSvg();
+
+    void loadTemplate();
     return () => {
       active = false;
+    };
+  }, [templatePath]);
+
+  useEffect(() => {
+    return () => {
+      const u = rasterUrlRef.current;
+      if (u) {
+        URL.revokeObjectURL(u);
+        rasterUrlRef.current = null;
+      }
+      const p = processedRasterRef.current;
+      if (p) {
+        URL.revokeObjectURL(p);
+        processedRasterRef.current = null;
+      }
     };
   }, []);
 
   useEffect(() => {
-    let active = true;
-    async function loadSponsorSvg() {
-      if (!sponsorAsset) {
-        if (active) {
-          setSponsorSource(null);
+    if (!rasterUrl) {
+      if (processedRasterRef.current) {
+        URL.revokeObjectURL(processedRasterRef.current);
+        processedRasterRef.current = null;
+      }
+      queueMicrotask(() => {
+        setProcessedRasterUrl(null);
+      });
+      return;
+    }
+
+    let cancelled = false;
+
+    void (async () => {
+      const url = await recolorRasterByOccurrence(
+        rasterUrl,
+        primaryColor,
+        secondaryColor,
+        tertiaryColor
+      );
+      if (cancelled) {
+        if (url) {
+          URL.revokeObjectURL(url);
         }
         return;
       }
-
-      try {
-        const response = await fetch(sponsorAsset, { cache: "no-store" });
-        const rawSvg = await response.text();
-        if (active) {
-          setSponsorSource(rawSvg);
-        }
-      } catch {
-        if (active) {
-          setSponsorSource(null);
-        }
+      if (processedRasterRef.current) {
+        URL.revokeObjectURL(processedRasterRef.current);
       }
-    }
+      processedRasterRef.current = url;
+      setProcessedRasterUrl(url);
+    })();
 
-    void loadSponsorSvg();
     return () => {
-      active = false;
+      cancelled = true;
+      if (processedRasterRef.current) {
+        URL.revokeObjectURL(processedRasterRef.current);
+        processedRasterRef.current = null;
+      }
+      queueMicrotask(() => {
+        setProcessedRasterUrl(null);
+      });
     };
-  }, [sponsorAsset]);
+  }, [rasterUrl, primaryColor, secondaryColor, tertiaryColor]);
 
   const recoloredSvg = useMemo(() => {
     if (!svgSource) {
@@ -247,30 +199,89 @@ export function F1CarPreview({
     }
 
     if (namedLayerMatches === 0) {
-      // Fallback for flattened exports without layer names.
-      // Keep neutral blacks/greys untouched.
-      next = applyColorByExistingFills(next, ["#E60000", "#E63030", "#D50002", "#B80002"], primaryColor);
-      next = applyColorByExistingFills(next, ["#BD1212", "#980002"], secondaryColor);
-      next = applyColorByExistingFills(next, ["#C9A418", "#FFAA00"], tertiaryColor);
+      next = applyColorByExistingFills(next, hexBuckets.primary, primaryColor);
+      next = applyColorByExistingFills(next, hexBuckets.secondary, secondaryColor);
+      next = applyColorByExistingFills(next, hexBuckets.tertiary, tertiaryColor);
     }
 
-    next = injectSponsor(next, sponsorSource, sponsorPrimaryColor, sponsorSecondaryColor);
-    next = injectCarNumber(next, carNumber);
     return next;
-  }, [carNumber, primaryColor, secondaryColor, sponsorPrimaryColor, sponsorSecondaryColor, sponsorSource, svgSource, tertiaryColor]);
+  }, [hexBuckets, primaryColor, secondaryColor, svgSource, tertiaryColor]);
+
+  const safeNumber = String(carNumber).replace(/[^0-9]/g, "");
 
   return (
     <div className="f1-car-shell" aria-label={`F1 livery preview for car ${carNumber}`}>
       <div className="f1-car-svg-wrap">
         {recoloredSvg ? (
-          <div
-            className="f1-car-svg"
-            role="img"
-            aria-label={`F1 livery SVG for car ${carNumber}`}
-            dangerouslySetInnerHTML={{ __html: recoloredSvg }}
-          />
+          <div className="f1-car-svg-stack">
+            <div
+              className="f1-car-svg"
+              role="img"
+              aria-label={`F1 livery for car ${carNumber}`}
+              dangerouslySetInnerHTML={{ __html: recoloredSvg }}
+            />
+            {safeNumber ? (
+              <>
+                <div
+                  className="f1-car-number-overlay f1-car-number-overlay--upper"
+                  style={{
+                    left: "52%",
+                    top: `calc(58% + ${CAR_NUMBER_OFFSET_Y_PX - CAR_NUMBER_UPPER_GAP_PX}px)`
+                  }}
+                  aria-hidden
+                >
+                  {safeNumber}
+                </div>
+                <div
+                  className="f1-car-number-overlay"
+                  style={{
+                    left: "52%",
+                    top: `calc(58% + ${CAR_NUMBER_OFFSET_Y_PX}px)`
+                  }}
+                >
+                  {safeNumber}
+                </div>
+              </>
+            ) : null}
+          </div>
+        ) : rasterUrl ? (
+          <div className="f1-car-raster-wrap">
+            <img src={processedRasterUrl ?? rasterUrl} className="f1-car-raster" alt="" />
+            {!processedRasterUrl ? (
+              <div
+                className="f1-car-raster-wash"
+                aria-hidden
+                style={{
+                  background: `linear-gradient(105deg, ${primaryColor}40 0%, transparent 42%, ${secondaryColor}35 55%, ${tertiaryColor}30 100%)`
+                }}
+              />
+            ) : null}
+            {safeNumber ? (
+              <>
+                <div
+                  className="f1-car-raster-number f1-car-raster-number--upper"
+                  style={{
+                    left: `${RASTER_NUMBER_STYLE.leftPct}%`,
+                    top: `calc(${RASTER_NUMBER_STYLE.topPct}% + ${CAR_NUMBER_OFFSET_Y_PX - CAR_NUMBER_UPPER_GAP_PX}px)`
+                  }}
+                  aria-hidden
+                >
+                  {safeNumber}
+                </div>
+                <div
+                  className="f1-car-raster-number"
+                  style={{
+                    left: `${RASTER_NUMBER_STYLE.leftPct}%`,
+                    top: `calc(${RASTER_NUMBER_STYLE.topPct}% + ${CAR_NUMBER_OFFSET_Y_PX}px)`
+                  }}
+                >
+                  {safeNumber}
+                </div>
+              </>
+            ) : null}
+          </div>
         ) : (
-          <p className="muted small">Loading car SVG preview...</p>
+          <p className="muted small">Loading car preview…</p>
         )}
       </div>
     </div>
