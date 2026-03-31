@@ -6,6 +6,7 @@ import Image from "next/image";
 import { EventRunFlowNav } from "@/components/EventRunFlowNav";
 import { TrafficLights } from "@/components/TrafficLights";
 import { formatTimerLabel } from "@/lib/timer";
+import { EventBrandLogos } from "@/components/EventBrandLogos";
 import { useEventState } from "@/lib/useEventState";
 
 /** Building Session #3 — 1h 45m on the local countdown. */
@@ -240,15 +241,7 @@ export default function Arena3Page() {
         <div className="arena-brief-main">
           <EventRunFlowNav current="arena" />
           <div className="arena-header-logo-wrap">
-            <Image
-              src="/GPLOGO.png"
-              alt="Grand Prix"
-              width={111}
-              height={80}
-              className="arena-header-logo"
-              priority
-              sizes="111px"
-            />
+            <EventBrandLogos variant="arena" />
           </div>
           <h1>Building Session #3</h1>
           <button

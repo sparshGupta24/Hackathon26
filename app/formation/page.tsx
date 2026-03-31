@@ -1,12 +1,12 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { EventRunFlowNav } from "@/components/EventRunFlowNav";
 import { F1CarPreview } from "@/components/F1CarPreview";
 import { carSvgPathForTemplateId, liveryHexBucketsForTemplate } from "@/lib/carSvgs";
 import { liveryForTeam } from "@/lib/teamLivery";
 import type { TeamState } from "@/lib/types";
+import { EventBrandLogos } from "@/components/EventBrandLogos";
 import { useEventState } from "@/lib/useEventState";
 
 const GRID_SLOTS = 6;
@@ -24,15 +24,7 @@ export default function FormationPage() {
     <main className="formation-page">
       <header className="formation-header">
         <EventRunFlowNav current="formation" />
-        <Image
-          src="/GPLOGO.png"
-          alt="Grand Prix"
-          width={421}
-          height={305}
-          className="formation-header-logo"
-          priority
-          sizes="(max-width: 640px) 28vw, 160px"
-        />
+        <EventBrandLogos variant="formation" className="formation-header-logo" />
         <h1>Formation grid</h1>
       </header>
 

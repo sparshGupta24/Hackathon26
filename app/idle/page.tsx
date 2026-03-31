@@ -3,6 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { EventRunFlowNav } from "@/components/EventRunFlowNav";
 import { IdleAudio } from "@/components/IdleAudio";
+import { GP_LOGO_PNG } from "@/lib/eventLogo";
 
 export const metadata: Metadata = {
   title: "Idle"
@@ -18,7 +19,7 @@ export default function IdlePage() {
         <EventRunFlowNav current="opening" />
       </div>
       <Image
-        src="/GPLOGO.png"
+        src={GP_LOGO_PNG}
         alt="Grand Prix"
         width={421}
         height={305}

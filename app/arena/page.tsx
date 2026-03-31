@@ -7,6 +7,7 @@ import { EventRunFlowNav } from "@/components/EventRunFlowNav";
 import { TrafficLights } from "@/components/TrafficLights";
 import { DEFAULT_BASE_DURATION_SEC } from "@/lib/constants";
 import { formatTimerLabel } from "@/lib/timer";
+import { EventBrandLogos } from "@/components/EventBrandLogos";
 import { useEventState } from "@/lib/useEventState";
 
 const TRACK_POINTS = [
@@ -241,15 +242,7 @@ export default function ArenaPage() {
         <div className="arena-brief-main">
           <EventRunFlowNav current="arena" />
           <div className="arena-header-logo-wrap">
-            <Image
-              src="/GPLOGO.png"
-              alt="Grand Prix"
-              width={111}
-              height={80}
-              className="arena-header-logo"
-              priority
-              sizes="111px"
-            />
+            <EventBrandLogos variant="arena" />
           </div>
           <h1>Live race screen</h1>
           <button

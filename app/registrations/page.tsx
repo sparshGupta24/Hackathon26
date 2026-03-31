@@ -12,6 +12,7 @@ import {
   liveryHexBucketsForTemplate
 } from "@/lib/carSvgs";
 import { MAX_PLAYERS, MIN_PLAYERS, TEAM_LIMIT, TEAM_ROLES } from "@/lib/constants";
+import { EventBrandLogos } from "@/components/EventBrandLogos";
 import type { PersonPublic } from "@/lib/types";
 import { useEventState } from "@/lib/useEventState";
 
@@ -231,11 +232,8 @@ export default function RegistrationsPage() {
         <>
           <section className="panel">
             <header className="reg-page-header">
-              <div className="reg-header-logos" aria-hidden>
-                {/* eslint-disable-next-line @next/next/no-img-element -- SVG logo from public */}
-                <img src="/F1DLOGO.svg" alt="" className="reg-header-logo" width={200} height={56} />
-                {/* eslint-disable-next-line @next/next/no-img-element -- PNG logo from public (same as idle) */}
-                <img src="/GPLOGO.png" alt="" className="reg-header-logo" width={120} height={56} />
+              <div className="reg-header-logos">
+                <EventBrandLogos variant="reg" />
               </div>
               <h1 className="reg-page-title">Team Registration</h1>
               <div className="reg-header-meta">

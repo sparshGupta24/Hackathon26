@@ -1,12 +1,12 @@
 import Link from "next/link";
+import { EventBrandLogos } from "@/components/EventBrandLogos";
 
 export default function EventHomePage() {
   return (
     <main className="page-shell event-home">
       <div className="event-home-inner">
         <div className="event-home-brand">
-          {/* eslint-disable-next-line @next/next/no-img-element -- SVG logo from public */}
-          <img src="/F1DLOGO.svg" alt="Event logo" className="event-home-logo" width={320} height={120} />
+          <EventBrandLogos variant="home" />
         </div>
         <nav className="event-home-ctas" aria-label="Event destinations">
           <Link href="/idle" className="btn-primary event-home-cta">

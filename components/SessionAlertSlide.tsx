@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { EventBrandLogos } from "@/components/EventBrandLogos";
 
 export type SessionAlertVisual = "brain" | "cup" | "logo" | "trophy" | "flag";
 
@@ -97,17 +98,7 @@ export function SessionAlertSlide({
               {visual === "brain" ? <BrainIcon className="session-alert-1-brain-icon" /> : null}
               {visual === "cup" ? <CupIcon className="session-alert-1-brain-icon" /> : null}
               {visual === "trophy" ? <TrophyIcon className="session-alert-1-brain-icon" /> : null}
-              {visual === "logo" ? (
-                <Image
-                  src="/GPLOGO.png"
-                  alt=""
-                  width={111}
-                  height={80}
-                  className="session-alert-1-frame-logo"
-                  priority
-                  sizes="200px"
-                />
-              ) : null}
+              {visual === "logo" ? <EventBrandLogos variant="sessionSlide" /> : null}
               {visual === "flag" ? (
                 <Image
                   src="/chequeredflag.png"

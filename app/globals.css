@@ -282,13 +282,6 @@ body.arena-static-bg {
   filter: drop-shadow(0 0 28px color-mix(in srgb, var(--accent) 35%, transparent));
 }
 
-.session-alert-1-frame-logo {
-  width: auto;
-  height: min(10.5rem, 46vw);
-  max-width: 88%;
-  object-fit: contain;
-}
-
 .session-alert-1-frame-flag {
   width: auto;
   height: min(9rem, 40vw);
@@ -498,13 +491,6 @@ body.arena-static-bg {
   line-height: 0;
 }
 
-.arena-header-logo {
-  height: 80px;
-  width: auto;
-  max-width: 100%;
-  object-fit: contain;
-}
-
 .idle-audio-mute {
   position: fixed;
   bottom: max(0.65rem, env(safe-area-inset-bottom));
@@ -599,6 +585,67 @@ a {
   max-height: 100px;
   object-fit: contain;
   filter: drop-shadow(0 8px 24px rgba(0, 0, 0, 0.45));
+}
+
+/* Event + GP — both marks share --event-brand-logo-h */
+.event-brand-pair {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(0.65rem, 2.2vw, 1.1rem);
+  line-height: 0;
+}
+
+.event-brand-pair__mark {
+  height: var(--event-brand-logo-h, 80px);
+  width: auto;
+  max-width: min(42vw, 200px);
+  object-fit: contain;
+  display: block;
+}
+
+.event-brand-pair--arena,
+.event-brand-pair--mission {
+  --event-brand-logo-h: 80px;
+}
+
+.event-brand-pair--arena .event-brand-pair__mark,
+.event-brand-pair--mission .event-brand-pair__mark {
+  max-width: min(40vw, 170px);
+}
+
+.event-brand-pair--formation {
+  --event-brand-logo-h: clamp(32px, 7.5vw, 48px);
+}
+
+.event-brand-pair--formation .event-brand-pair__mark {
+  max-width: min(38vw, 7rem);
+}
+
+.event-brand-pair--home {
+  --event-brand-logo-h: min(96px, 22vw);
+  filter: drop-shadow(0 8px 24px rgba(0, 0, 0, 0.45));
+}
+
+.event-brand-pair--home .event-brand-pair__mark {
+  max-width: min(44vw, 180px);
+}
+
+.event-brand-pair--reg {
+  --event-brand-logo-h: clamp(40px, 8vw, 56px);
+}
+
+.event-brand-pair--reg .event-brand-pair__mark {
+  max-width: min(40vw, 160px);
+}
+
+.event-brand-pair--session-slide {
+  --event-brand-logo-h: min(6.25rem, 26vw);
+}
+
+.event-brand-pair--session-slide .event-brand-pair__mark {
+  max-width: 44%;
 }
 
 .event-home-ctas {
@@ -4322,13 +4369,6 @@ select {
   flex-wrap: wrap;
 }
 
-.reg-header-logo {
-  height: clamp(40px, 8vw, 56px);
-  width: auto;
-  object-fit: contain;
-  display: block;
-}
-
 .reg-page-title {
   margin: 30px 0 0;
   font-family: var(--font-heading), sans-serif;
@@ -5658,13 +5698,6 @@ span.team-award-roster-avatar.team-award-roster-fallback {
   display: flex;
   justify-content: center;
   padding: 20px 0;
-}
-
-.mission-reveal-header-logo {
-  width: auto;
-  height: 80px;
-  max-width: min(100%, 280px);
-  object-fit: contain;
 }
 
 .mission-reveal-header-actions {

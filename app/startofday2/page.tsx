@@ -10,7 +10,7 @@ export default function StartOfDay2Page() {
     <SessionAlertSlide
       title="Welcome back to Day 2"
       visual="logo"
-      visualAriaLabel="Grand Prix"
+      visualAriaLabel="Event and Grand Prix logos"
       nextHref="/arena3"
     />
   );

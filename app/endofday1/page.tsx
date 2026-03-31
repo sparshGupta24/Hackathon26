@@ -10,7 +10,7 @@ export default function EndOfDay1Page() {
     <SessionAlertSlide
       title="End of Day 1- See you tomorrow"
       visual="logo"
-      visualAriaLabel="Grand Prix"
+      visualAriaLabel="Event and Grand Prix logos"
       nextHref="/startofday2"
     />
   );

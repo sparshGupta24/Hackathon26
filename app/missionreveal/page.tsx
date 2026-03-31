@@ -1,7 +1,7 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
+import { EventBrandLogos } from "@/components/EventBrandLogos";
 import { MissionRevealCard } from "@/components/MissionRevealCard";
 import { useEventState } from "@/lib/useEventState";
 
@@ -12,15 +12,7 @@ export default function MissionRevealPage() {
     <main className="page-shell mission-reveal-page">
       <header className="team-awards-header mission-reveal-header">
         <div className="mission-reveal-header-brand">
-          <Image
-            src="/GPLOGO.png"
-            alt="Grand Prix"
-            width={111}
-            height={80}
-            className="mission-reveal-header-logo"
-            priority
-            sizes="111px"
-          />
+          <EventBrandLogos variant="mission" />
         </div>
         <h1>Mission reveal</h1>
         <div className="mission-reveal-header-actions">
