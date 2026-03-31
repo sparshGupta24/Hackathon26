@@ -7,7 +7,6 @@ export async function GET() {
     const state = await getEventState();
     return NextResponse.json(state);
   } catch (error) {
-    console.error("Failed to fetch event state", error);
-    return serverError();
+    return serverError("Failed to fetch event state", error);
   }
 }

@@ -31,7 +31,10 @@ export function getRemainingSeconds(timer: TimerCore, nowMs = Date.now()): numbe
 }
 
 export function shouldAutoEnd(timer: TimerCore, nowMs = Date.now()): boolean {
-  return timer.status === "running" && getRemainingSeconds(timer, nowMs) <= 0;
+  if (timer.status !== "running" || timer.startedAt == null) {
+    return false;
+  }
+  return getRemainingSeconds(timer, nowMs) <= 0;
 }
 
 export function formatTimerLabel(totalSeconds: number): string {

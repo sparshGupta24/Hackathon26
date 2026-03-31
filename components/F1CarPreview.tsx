@@ -2,16 +2,15 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { LiveryHexBuckets } from "@/lib/carSvgs";
 import { recolorRasterByOccurrence } from "@/lib/rasterLivery";
 
-const RASTER_NUMBER_STYLE = {
-  leftPct: 52,
-  topPct: 42
+/** % positions inside the livery graphic (top-down view); no px — scales with card size. */
+const SVG_NUMBER_UPPER = { left: "50%", top: "44%" } as const;
+const SVG_NUMBER_MAIN = { left: "50%", top: "57%" } as const;
+
+const RASTER_NUMBER = {
+  leftPct: 50,
+  topUpperPct: 44,
+  topMainPct: 57
 } as const;
-
-/** Extra downward offset for the car number (CSS px; works for SVG + raster overlays). */
-const CAR_NUMBER_OFFSET_Y_PX = 50;
-
-/** Second (smaller) number is placed this many px above the main overlay. */
-const CAR_NUMBER_UPPER_GAP_PX = 300;
 
 interface F1CarPreviewProps {
   templatePath: string;
@@ -224,20 +223,14 @@ export function F1CarPreview({
               <>
                 <div
                   className="f1-car-number-overlay f1-car-number-overlay--upper"
-                  style={{
-                    left: "52%",
-                    top: `calc(58% + ${CAR_NUMBER_OFFSET_Y_PX - CAR_NUMBER_UPPER_GAP_PX}px)`
-                  }}
+                  style={{ left: SVG_NUMBER_UPPER.left, top: SVG_NUMBER_UPPER.top }}
                   aria-hidden
                 >
                   {safeNumber}
                 </div>
                 <div
                   className="f1-car-number-overlay"
-                  style={{
-                    left: "52%",
-                    top: `calc(58% + ${CAR_NUMBER_OFFSET_Y_PX}px)`
-                  }}
+                  style={{ left: SVG_NUMBER_MAIN.left, top: SVG_NUMBER_MAIN.top }}
                 >
                   {safeNumber}
                 </div>
@@ -261,8 +254,8 @@ export function F1CarPreview({
                 <div
                   className="f1-car-raster-number f1-car-raster-number--upper"
                   style={{
-                    left: `${RASTER_NUMBER_STYLE.leftPct}%`,
-                    top: `calc(${RASTER_NUMBER_STYLE.topPct}% + ${CAR_NUMBER_OFFSET_Y_PX - CAR_NUMBER_UPPER_GAP_PX}px)`
+                    left: `${RASTER_NUMBER.leftPct}%`,
+                    top: `${RASTER_NUMBER.topUpperPct}%`
                   }}
                   aria-hidden
                 >
@@ -271,8 +264,8 @@ export function F1CarPreview({
                 <div
                   className="f1-car-raster-number"
                   style={{
-                    left: `${RASTER_NUMBER_STYLE.leftPct}%`,
-                    top: `calc(${RASTER_NUMBER_STYLE.topPct}% + ${CAR_NUMBER_OFFSET_Y_PX}px)`
+                    left: `${RASTER_NUMBER.leftPct}%`,
+                    top: `${RASTER_NUMBER.topMainPct}%`
                   }}
                 >
                   {safeNumber}

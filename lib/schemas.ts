@@ -27,8 +27,32 @@ export const timerExtendSchema = z.object({
   minutes: z.union([z.literal(5), z.literal(10)])
 });
 
+export const teamProgressDeltaSchema = z.union([
+  z.literal(-10),
+  z.literal(0),
+  z.literal(10),
+  z.literal(20)
+]);
+
 export const teamProgressSchema = z.object({
   teamId: z.string().min(1),
-  delta: z.union([z.literal(1), z.literal(-1)]),
+  delta: teamProgressDeltaSchema,
   message: z.string().trim().min(1).max(140)
+});
+
+export const deleteTeamSchema = z.object({
+  teamId: z.string().trim().min(1, "teamId is required")
+});
+
+export const challengePromptSchema = z.object({
+  teamId: z.string().trim().min(1, "teamId is required"),
+  prompt: z.string().trim().min(12, "Prompt is too short").max(500, "Prompt is too long"),
+  spinsUsed: z.number().int().min(1, "Spin at least once").max(3, "At most three spins are allowed")
+});
+
+export const missionStatementTextMax = 2000;
+
+export const missionStatementUpdateSchema = z.object({
+  teamId: z.string().trim().min(1, "teamId is required"),
+  statement: z.string().trim().max(missionStatementTextMax, "Mission statement is too long")
 });

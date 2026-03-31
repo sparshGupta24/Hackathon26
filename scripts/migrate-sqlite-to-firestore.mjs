@@ -6,6 +6,7 @@
  *
  * Requires the same Firebase Admin env as the Next app (see .env.example).
  * Overwrites `teams/{id}` and `config/raceUpdate`, `config/eventTimer` if they already exist.
+ * Does not touch `config/volunteerRewards` (volunteer portal awards).
  */
 
 import { createRequire } from "node:module";

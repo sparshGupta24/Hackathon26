@@ -23,7 +23,7 @@ function playerOnTeam(team: TeamState | null, playerId: string) {
 }
 
 export default function VotingResultsPage() {
-  const { data, loading, error } = useEventState(true);
+  const { data, loading, error, refresh } = useEventState(true);
   const [revealed, setRevealed] = useState(false);
   const [tallies, setTallies] = useState<TalliesPayload["tallies"] | null>(null);
   const [tallyLoading, setTallyLoading] = useState(false);
@@ -53,14 +53,13 @@ export default function VotingResultsPage() {
     setRevealed(true);
   };
 
-  const gunnerWinners = useMemo(() => {
-    const list = tallies?.byCategory.gunner ?? [];
-    return topVoteRecipients(list);
-  }, [tallies]);
-
-  const ripperWinners = useMemo(() => {
-    const list = tallies?.byCategory.ripper ?? [];
-    return topVoteRecipients(list);
+  const winnersByCategory = useMemo(() => {
+    const out: Record<VoteCategoryId, VoteTallyEntry[]> = {} as Record<VoteCategoryId, VoteTallyEntry[]>;
+    for (const c of VOTE_CATEGORIES) {
+      const list = tallies?.byCategory[c.id] ?? [];
+      out[c.id] = topVoteRecipients(list);
+    }
+    return out;
   }, [tallies]);
 
   return (
@@ -72,7 +71,7 @@ export default function VotingResultsPage() {
           <p className="muted">Live tally from audience ballots. Reveal shows leaders at that moment; voting can continue.</p>
         </div>
         <div className="hero-actions">
-          <Link href="/" className="btn-secondary">
+          <Link href="/home" className="btn-secondary">
             Home
           </Link>
           <Link href="/vote" className="btn-secondary">
@@ -81,8 +80,15 @@ export default function VotingResultsPage() {
         </div>
       </header>
 
-      {loading || !data ? (
+      {loading && !data ? (
         <p className="panel">Loading…</p>
+      ) : !data ? (
+        <div className="panel admin-state-fallback">
+          <p className="error-text">{error ?? "Unable to load event state."}</p>
+          <button type="button" className="btn-primary" onClick={() => void refresh()}>
+            Retry
+          </button>
+        </div>
       ) : error ? (
         <p className="panel error-text">{error}</p>
       ) : (
@@ -113,55 +119,36 @@ export default function VotingResultsPage() {
               {tallyError ? <p className="error-text">{tallyError}</p> : null}
 
               <div className="vote-results-categories">
-                <div className="vote-results-category">
-                  <h2 className="vote-results-category-title">{VOTE_CATEGORIES[0]!.label}</h2>
-                  {!gunnerWinners.length ? (
-                    <p className="muted">No votes in this category yet.</p>
-                  ) : (
-                    <div className="vote-winners-row">
-                      {gunnerWinners.map((w) => {
-                        const team = teamById(teams, w.teamId);
-                        const pl = playerOnTeam(team, w.playerId);
-                        return (
-                          <VoteWinnerTile
-                            key={`${w.teamId}-${w.playerId}`}
-                            categoryLabel={VOTE_CATEGORIES[0]!.label}
-                            playerName={pl?.name ?? "Unknown"}
-                            teamName={team?.name ?? "Team"}
-                            photoUrl={pl?.photoUrl}
-                            team={team}
-                            voteCount={w.count}
-                          />
-                        );
-                      })}
+                {VOTE_CATEGORIES.map((cat) => {
+                  const winners = winnersByCategory[cat.id] ?? [];
+                  return (
+                    <div key={cat.id} className="vote-results-category">
+                      <h2 className="vote-results-category-title">{cat.label}</h2>
+                      <p className="muted small vote-results-category-desc">{cat.description}</p>
+                      {!winners.length ? (
+                        <p className="muted">No votes in this category yet.</p>
+                      ) : (
+                        <div className="vote-winners-row">
+                          {winners.map((w) => {
+                            const team = teamById(teams, w.teamId);
+                            const pl = playerOnTeam(team, w.playerId);
+                            return (
+                              <VoteWinnerTile
+                                key={`${w.teamId}-${w.playerId}`}
+                                categoryLabel={cat.label}
+                                playerName={pl?.name ?? "Unknown"}
+                                teamName={team?.name ?? "Team"}
+                                photoUrl={pl?.photoUrl}
+                                team={team}
+                                voteCount={w.count}
+                              />
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-
-                <div className="vote-results-category">
-                  <h2 className="vote-results-category-title">{VOTE_CATEGORIES[1]!.label}</h2>
-                  {!ripperWinners.length ? (
-                    <p className="muted">No votes in this category yet.</p>
-                  ) : (
-                    <div className="vote-winners-row">
-                      {ripperWinners.map((w) => {
-                        const team = teamById(teams, w.teamId);
-                        const pl = playerOnTeam(team, w.playerId);
-                        return (
-                          <VoteWinnerTile
-                            key={`${w.teamId}-${w.playerId}`}
-                            categoryLabel={VOTE_CATEGORIES[1]!.label}
-                            playerName={pl?.name ?? "Unknown"}
-                            teamName={team?.name ?? "Team"}
-                            photoUrl={pl?.photoUrl}
-                            team={team}
-                            voteCount={w.count}
-                          />
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
+                  );
+                })}
               </div>
             </>
           ) : null}

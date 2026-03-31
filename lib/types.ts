@@ -1,3 +1,6 @@
+import type { VolunteerAwardKey } from "./volunteerRewards";
+import type { VoteCategoryId } from "./voteCategories";
+
 /** Roster entry from Firestore `people` collection (public API shape). */
 export interface PersonPublic {
   id: string;
@@ -33,6 +36,12 @@ export interface TeamState {
   createdAt: string;
   players: PlayerState[];
   livery: LiveryState | null;
+  /** Challenge prompt from registration step 2 (slot machine), once finalized. */
+  challengePrompt?: string;
+  /** How many lever pulls were used before choosing (1–3). */
+  promptSpinsUsed?: number;
+  /** Volunteer-entered mission statement text. */
+  missionStatement?: string;
 }
 
 export interface RaceUpdateState {
@@ -52,6 +61,8 @@ export interface TimerState {
   updatedAt: string;
   totalDurationSec: number;
   remainingSec: number;
+  /** When true and status is idle, arena shows the F1 start lights before POST /api/timer/start. */
+  startCeremonyPending: boolean;
 }
 
 export interface EventStateResponse {
@@ -60,3 +71,40 @@ export interface EventStateResponse {
   raceUpdate: RaceUpdateState | null;
   serverTime: string;
 }
+
+/** Volunteer portal: one registered team per award (or null). */
+export type VolunteerAwardSelection = { teamId: string; teamName: string } | null;
+
+export type VolunteerRewardsState = {
+  awards: Record<VolunteerAwardKey, VolunteerAwardSelection>;
+  updatedAt: string | null;
+};
+
+/** Ceremony page: one row per award with optional resolved team. */
+export type TeamAwardPresentationItem = {
+  key: VolunteerAwardKey;
+  title: string;
+  description: string;
+  team: TeamState | null;
+};
+
+/** Audience vote winner on /people-awards (resolved from tallies). */
+export type PeopleAwardWinnerPresentation = {
+  playerId: string;
+  teamId: string;
+  name: string;
+  photoUrl?: string;
+  teamName: string;
+};
+
+/** Ceremony page: one audience nomination category with optional top vote-getter. */
+export type PeopleAwardPresentationItem = {
+  key: VoteCategoryId;
+  title: string;
+  description: string;
+  winner: PeopleAwardWinnerPresentation | null;
+  /** Team entity for livery preview when known. */
+  team: TeamState | null;
+};
+
+export type { VolunteerAwardKey } from "./volunteerRewards";

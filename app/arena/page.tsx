@@ -1,9 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { EventRunFlowNav } from "@/components/EventRunFlowNav";
 import { TrafficLights } from "@/components/TrafficLights";
+import { DEFAULT_BASE_DURATION_SEC } from "@/lib/constants";
+import { formatTimerLabel } from "@/lib/timer";
 import { useEventState } from "@/lib/useEventState";
 
 const TRACK_POINTS = [
@@ -43,40 +46,21 @@ function getTrackPoint(progress: number) {
   };
 }
 
-interface ArenaStage {
-  title: string;
-  subtitle: string;
-  kind: "timed" | "text";
-  durationSec?: number;
-}
-
-const EVENT_STAGES: ArenaStage[] = [
-  { title: "Team registration", subtitle: "Confirm all teams and livery setup.", kind: "text" },
-  { title: "Timed Session 1: Pre prompt", subtitle: "Plan strategy before prompts drop.", kind: "timed", durationSec: 60 },
-  { title: "Regulatory check", subtitle: "Mini presentation and compliance check.", kind: "text" },
-  { title: "Timed Session 2: Start building", subtitle: "Begin implementation sprint.", kind: "timed", durationSec: 60 },
-  { title: "Regulatory check 2", subtitle: "Review current progress and blockers.", kind: "text" },
-  { title: "Pit closure", subtitle: "Tea time.", kind: "text" },
-  { title: "Timed Session 3: Start building 2", subtitle: "Continue build sprint with fixes.", kind: "timed", durationSec: 60 },
-  { title: "End of Day 1", subtitle: "Wrap-up and prepare for next phase.", kind: "text" },
-  { title: "Bingo", subtitle: "Quick activity before final run.", kind: "text" },
-  { title: "Timed Session 4: Start building 3", subtitle: "Final main build window.", kind: "timed", durationSec: 60 },
-  { title: "Regulatory check", subtitle: "Mini presentation checkpoint.", kind: "text" },
-  { title: "Timed Session 4: Fine tuning", subtitle: "Polish and optimize the solution.", kind: "timed", durationSec: 60 },
-  { title: "Regulatory check", subtitle: "Final compliance review.", kind: "text" },
-  { title: "Showdown", subtitle: "Present and battle-test all teams.", kind: "text" },
-  { title: "Winners", subtitle: "Celebrate top teams and close event.", kind: "text" }
-];
+type LocalPhase = "ceremony" | "running" | "paused" | "ended";
 
 export default function ArenaPage() {
-  const { data } = useEventState(true);
-  const [stageIndex, setStageIndex] = useState(0);
-  const [phase, setPhase] = useState<"stage_text" | "stage_start" | "running" | "paused" | "ended">(
-    EVENT_STAGES[0].kind === "timed" ? "stage_start" : "stage_text"
-  );
-  const [remainingSec, setRemainingSec] = useState(EVENT_STAGES[0].durationSec ?? 60);
+  // Shorter than other pages: radio + pit updates come from `/api/state`; 60s felt “broken” during a live session.
+  const { data, loading, error, refresh } = useEventState(true, 5_000);
   const [showCircuit, setShowCircuit] = useState(false);
-  const [extendingMinutes, setExtendingMinutes] = useState<5 | 10 | null>(null);
+
+  const [ceremonyKey, setCeremonyKey] = useState(0);
+  const [phase, setPhase] = useState<LocalPhase>("ceremony");
+  const [sessionSeconds, setSessionSeconds] = useState(DEFAULT_BASE_DURATION_SEC);
+  const [remainingSec, setRemainingSec] = useState(DEFAULT_BASE_DURATION_SEC);
+
+  const sessionSecondsRef = useRef(sessionSeconds);
+  sessionSecondsRef.current = sessionSeconds;
+
   const [liveNotifications, setLiveNotifications] = useState<
     Array<{
       id: string;
@@ -88,8 +72,34 @@ export default function ArenaPage() {
   >([]);
   const timeoutMapRef = useRef<Map<string, number>>(new Map());
   const seenUpdateRef = useRef<string | null>(null);
+  const radioSessionReadyRef = useRef(false);
   const notificationAudioRef = useRef<HTMLAudioElement | null>(null);
+  /** One chime per server update — avoids double `play()` from Strict Mode or overlapping polls. */
+  const lastRadioChimeRef = useRef<{ updatedAt: string; at: number } | null>(null);
   const teams = data?.teams ?? [];
+
+  useEffect(() => {
+    document.body.classList.add("arena-static-bg");
+    return () => {
+      document.body.classList.remove("arena-static-bg");
+    };
+  }, []);
+
+  useEffect(() => {
+    if (phase !== "running") {
+      return;
+    }
+    const id = window.setInterval(() => {
+      setRemainingSec((r) => Math.max(0, r - 1));
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [phase]);
+
+  useEffect(() => {
+    if (phase === "running" && remainingSec === 0) {
+      setPhase("ended");
+    }
+  }, [phase, remainingSec]);
 
   useEffect(() => {
     const timeoutMap = timeoutMapRef.current;
@@ -101,36 +111,64 @@ export default function ArenaPage() {
     };
   }, []);
 
+  const raceSignature = useMemo(() => {
+    const r = data?.raceUpdate;
+    if (!r?.updatedAt) {
+      return "";
+    }
+    return [r.updatedAt, r.teamId ?? "", r.message, String(r.delta)].join("\0");
+  }, [data?.raceUpdate?.updatedAt, data?.raceUpdate?.teamId, data?.raceUpdate?.message, data?.raceUpdate?.delta]);
+
   useEffect(() => {
-    if (!data?.raceUpdate) {
+    if (!raceSignature || !data?.raceUpdate) {
       return;
     }
 
     const { updatedAt, teamName, message, delta, accentColor } = data.raceUpdate;
-    if (!updatedAt || seenUpdateRef.current === updatedAt) {
+
+    if (!radioSessionReadyRef.current) {
+      radioSessionReadyRef.current = true;
+      seenUpdateRef.current = raceSignature;
       return;
     }
-    seenUpdateRef.current = updatedAt;
+
+    if (seenUpdateRef.current === raceSignature) {
+      return;
+    }
+    seenUpdateRef.current = raceSignature;
 
     window.setTimeout(() => {
-      setLiveNotifications((prev) => [
-        {
-          id: updatedAt,
-          teamName,
-          message,
-          delta,
-          accentColor
-        },
-        ...prev
-      ].slice(0, 2));
+      setLiveNotifications((prev) =>
+        [
+          {
+            id: updatedAt,
+            teamName,
+            message,
+            delta,
+            accentColor
+          },
+          ...prev
+        ].slice(0, 2)
+      );
     }, 0);
 
-    if (!notificationAudioRef.current) {
-      notificationAudioRef.current = new Audio("/f1_radio.mp3");
-      notificationAudioRef.current.volume = 0.85;
+    const now = typeof performance !== "undefined" ? performance.now() : Date.now();
+    const prevChime = lastRadioChimeRef.current;
+    const chimeDedupMs = 900;
+    const shouldPlayChime =
+      !prevChime || prevChime.updatedAt !== updatedAt || now - prevChime.at >= chimeDedupMs;
+
+    if (shouldPlayChime) {
+      lastRadioChimeRef.current = { updatedAt, at: now };
+      if (!notificationAudioRef.current) {
+        notificationAudioRef.current = new Audio("/f1_radio.mp3");
+        notificationAudioRef.current.volume = 0.85;
+      }
+      const audio = notificationAudioRef.current;
+      audio.pause();
+      audio.currentTime = 0;
+      void audio.play().catch(() => {});
     }
-    notificationAudioRef.current.currentTime = 0;
-    void notificationAudioRef.current.play().catch(() => {});
 
     const existingTimer = timeoutMapRef.current.get(updatedAt);
     if (existingTimer) {
@@ -141,228 +179,252 @@ export default function ArenaPage() {
       timeoutMapRef.current.delete(updatedAt);
     }, 8000);
     timeoutMapRef.current.set(updatedAt, timerId);
-  }, [data?.raceUpdate]);
+    // Depends on raceSignature only: each poll allocates a new `raceUpdate` object; primitive signature avoids spurious runs.
+  }, [raceSignature]);
 
-  useEffect(() => {
-    if (phase !== "running") {
-      return;
+  const onLightsComplete = useCallback(() => {
+    setRemainingSec(sessionSecondsRef.current);
+    setPhase("running");
+  }, []);
+
+  const skipToNextStage = useCallback(() => {
+    if (phase === "ceremony") {
+      setRemainingSec(sessionSecondsRef.current);
+      setPhase("running");
+    } else if (phase === "running") {
+      setPhase("ended");
+    } else if (phase === "paused") {
+      setPhase("ended");
     }
-    const interval = window.setInterval(() => {
-      setRemainingSec((prev) => {
-        if (prev <= 1) {
-          window.clearInterval(interval);
-          setPhase("ended");
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => window.clearInterval(interval);
   }, [phase]);
 
-  const stage = EVENT_STAGES[stageIndex];
-  const isTimedStage = stage.kind === "timed";
-  const hasNextStage = stageIndex < EVENT_STAGES.length - 1;
-
-  function completeLightsAndStartTimer() {
-    setPhase("running");
-  }
-
-  function resumeFromSafetyCar() {
-    if (remainingSec <= 0) {
-      setPhase("ended");
-      return;
+  function addMinutes(minutes: 5 | 10) {
+    const add = minutes * 60;
+    if (phase === "ceremony") {
+      setSessionSeconds((s) => s + add);
+      setRemainingSec((r) => r + add);
+    } else if (phase === "running" || phase === "paused") {
+      setRemainingSec((r) => r + add);
+      setSessionSeconds((s) => s + add);
     }
-    setPhase("running");
   }
 
-  function pauseTimer() {
+  function pauseLocalTimer() {
     setPhase("paused");
   }
 
-  async function extendTimer(minutes: 5 | 10) {
-    setExtendingMinutes(minutes);
-    setRemainingSec((prev) => prev + minutes * 60);
-    setExtendingMinutes(null);
+  function resumeLocalTimer() {
+    setPhase("running");
   }
 
-  function goToNextStage() {
-    if (!hasNextStage) {
-      return;
-    }
-    const nextIndex = Math.min(stageIndex + 1, EVENT_STAGES.length - 1);
-    const nextStage = EVENT_STAGES[nextIndex];
-    setStageIndex(nextIndex);
-    if (nextStage.kind === "timed") {
-      setRemainingSec(nextStage.durationSec ?? 60);
-      setPhase("stage_start");
-    } else {
-      setPhase("stage_text");
-    }
-    setExtendingMinutes(null);
+  function resetLocalSession() {
+    setPhase("ceremony");
+    setSessionSeconds(DEFAULT_BASE_DURATION_SEC);
+    setRemainingSec(DEFAULT_BASE_DURATION_SEC);
+    setCeremonyKey((k) => k + 1);
   }
 
-  function skipToNextStage() {
-    goToNextStage();
-  }
+  const clockSeconds = phase === "ceremony" ? sessionSeconds : remainingSec;
+  const timerLabel = useMemo(() => formatTimerLabel(clockSeconds), [clockSeconds]);
 
-  const timerLabel = useMemo(() => {
-    const mins = Math.floor(remainingSec / 60)
-      .toString()
-      .padStart(2, "0");
-    const secs = (remainingSec % 60).toString().padStart(2, "0");
-    return `${mins}:${secs}`;
-  }, [remainingSec]);
-
-  const isEnded = phase === "ended";
-  const showStartLights = phase === "stage_start";
-  const showSafetyLights = phase === "paused";
-  const showTimer = phase === "running" || phase === "paused";
-  const canShowTimedNextCTA = isTimedStage && isEnded;
-  const canShowTextNextCTA = !isTimedStage;
+  const showStartLights = phase === "ceremony";
+  const showPaused = phase === "paused";
+  const showRunning = phase === "running";
+  const showEnded = phase === "ended";
+  const showBigClock = showRunning || showPaused || showEnded;
+  const circuitActive = showCircuit && (showRunning || showPaused || showEnded);
+  const showSkipControl = phase === "ceremony" || phase === "running" || phase === "paused";
 
   return (
     <main className="page-shell arena-shell">
       <header className="hero compact arena-brief">
-        <div>
-          <p className="kicker">PIXEL PRIX 2026, BENGALURU</p>
-          <h1>{stage.title}</h1>
-          <p className="muted stage-subtitle">{stage.subtitle}</p>
-        </div>
-        <div className="hero-actions">
-          <Link href="/" className="btn-secondary">
-            Back To Registration
-          </Link>
-          <Link href="/prompt-generator" className="btn-primary">
-            Prompt Generator
-          </Link>
-          <button className="btn-secondary" type="button" onClick={() => setShowCircuit((prev) => !prev)}>
-            {showCircuit ? "Hide Circuit" : "View Circuit"}
+        <div className="arena-brief-main">
+          <EventRunFlowNav current="arena" />
+          <div className="arena-header-logo-wrap">
+            <Image
+              src="/GPLOGO.png"
+              alt="Grand Prix"
+              width={111}
+              height={80}
+              className="arena-header-logo"
+              priority
+              sizes="111px"
+            />
+          </div>
+          <h1>Live race screen</h1>
+          <button
+            className="btn-secondary arena-header-circuit"
+            type="button"
+            onClick={() => setShowCircuit((prev) => !prev)}
+          >
+            {showCircuit ? "Hide circuit" : "View circuit"}
           </button>
         </div>
       </header>
 
-      <>
-        {showStartLights ? <TrafficLights mode="start" onComplete={completeLightsAndStartTimer} /> : null}
-        {showSafetyLights ? (
-          <>
-            <TrafficLights mode="yellow" />
-            <button className="btn-primary" type="button" onClick={() => void resumeFromSafetyCar()}>
-              Resume Race
-            </button>
-          </>
-        ) : null}
-        <section className={`race-main ${showCircuit ? "with-circuit" : ""}`}>
-          <section className="timer-stage">
-            {isTimedStage && hasNextStage ? (
-              <button className="skip-stage-btn" type="button" onClick={skipToNextStage}>
-                Skip to next
-              </button>
-            ) : null}
-            {liveNotifications.length ? (
-              <section className="radio-stack" aria-label="Live radio notifications">
-                {liveNotifications.map((raceUpdate, index) => {
-                  const raceUpdateSubtext =
-                    raceUpdate.delta !== 0
-                      ? raceUpdate.delta > 0
-                        ? "Gaining positions on track"
-                        : "Losing positions on track"
-                      : "Holding current position";
-                  return (
-                    <aside
-                      key={raceUpdate.id}
-                      className={`radio-note ${index === 0 ? "radio-note-current" : "radio-note-older"}`}
-                      style={{ ["--radio-accent" as string]: raceUpdate.accentColor }}
-                    >
-                      <div className="radio-note-head">
-                        <p className="radio-note-team">{raceUpdate.teamName}</p>
-                        <p className="radio-note-label">RADIO</p>
-                      </div>
-                      <div className="radio-wave" aria-hidden="true">
-                        {Array.from({ length: 18 }).map((_, barIndex) => (
-                          <span key={`${raceUpdate.id}-wave-${barIndex}`} style={{ animationDelay: `${barIndex * 55}ms` }} />
-                        ))}
-                      </div>
-                      <p className="radio-note-message">&ldquo;{raceUpdate.message}&rdquo;</p>
-                      <p className="radio-note-sub">{raceUpdateSubtext}</p>
-                    </aside>
-                  );
-                })}
-              </section>
-            ) : null}
-            {showTimer ? <div className={`race-clock ${remainingSec <= 10 ? "urgent" : ""} ${phase === "paused" ? "timer-paused" : ""}`}>{timerLabel}</div> : null}
-            {showTimer && !isEnded && isTimedStage ? (
-              <div className="timer-actions arena-controls">
-                <button className="btn-secondary" type="button" onClick={() => void pauseTimer()} disabled={phase !== "running"}>
-                  Pause Timer
-                </button>
-                <button className="btn-secondary" type="button" onClick={() => void extendTimer(5)} disabled={extendingMinutes !== null}>
-                  {extendingMinutes === 5 ? "Adding..." : "+5 min"}
-                </button>
-                <button className="btn-secondary" type="button" onClick={() => void extendTimer(10)} disabled={extendingMinutes !== null}>
-                  {extendingMinutes === 10 ? "Adding..." : "+10 min"}
-                </button>
-              </div>
-            ) : null}
-            {canShowTimedNextCTA ? (
-              <div className="stage-next-wrap">
-                <div className="checkered-banner" />
-                <p className="checkered-caption">End of the session</p>
-                <button className="btn-primary" type="button" onClick={goToNextStage}>
-                  Next Stage
-                </button>
-              </div>
-            ) : null}
-            {canShowTextNextCTA ? (
-              <div className="stage-text-card">
-                <p className="muted">Stage {stageIndex + 1} of {EVENT_STAGES.length}</p>
-                <h2>{stage.title}</h2>
-                <p>{stage.subtitle}</p>
-                {hasNextStage ? (
-                  <button className="btn-primary" type="button" onClick={goToNextStage}>
-                    Next Stage
-                  </button>
-                ) : (
-                  <Link className="btn-primary" href="/">
-                    Back to Registration
-                  </Link>
-                )}
-              </div>
-            ) : null}
-          </section>
+      {showSkipControl ? (
+        <button
+          type="button"
+          className="arena-skip-stage"
+          onClick={skipToNextStage}
+          aria-label={phase === "ceremony" ? "Skip start lights and begin timer" : "Skip to session complete"}
+        >
+          Skip
+        </button>
+      ) : null}
 
-          {showCircuit && (showTimer || isEnded) ? (
-            <aside className="circuit-side-card" aria-label="Circuit map panel">
-              <p className="kicker">Circuit</p>
-              <div className="map-wrap circuit-map-wrap">
-                <Image src="/circuit-placeholder.svg" alt="Circuit map" width={1400} height={880} className="map-image" priority />
-                {teams.map((team, index) => {
-                  const point = getTrackPoint(team.progress);
-                  return (
-                    <div
-                      className="start-marker-on-track"
-                      key={team.id}
-                      style={{
-                        left: `${(point.x / 1400) * 100}%`,
-                        top: `${(point.y / 880) * 100}%`,
-                        transform: `translate(-50%, -50%) translateY(${index * 2}px)`
-                      }}
-                    >
-                      <span
-                        className="start-marker-dot"
-                        style={{ backgroundColor: team.livery?.primaryColor ?? "#FFFFFF" }}
-                        aria-hidden="true"
-                      />
-                      <span className="start-marker-name">{team.name}</span>
+      <section className={`race-main arena-race-main ${showCircuit ? "with-circuit" : ""}`}>
+        <section className="timer-stage arena-race-hub">
+          {showStartLights ? (
+            <TrafficLights key={ceremonyKey} mode="start" intervalMs={1000} onComplete={onLightsComplete} />
+          ) : null}
+
+          {liveNotifications.length ? (
+            <section className="radio-stack" aria-label="Live radio notifications">
+              {liveNotifications.map((raceUpdate, index) => {
+                const raceUpdateSubtext =
+                  raceUpdate.delta !== 0
+                    ? raceUpdate.delta > 0
+                      ? "Gaining positions on track"
+                      : "Losing positions on track"
+                    : "Holding current position";
+                return (
+                  <aside
+                    key={raceUpdate.id}
+                    className={`radio-note ${index === 0 ? "radio-note-current" : "radio-note-older"}`}
+                    style={{ ["--radio-accent" as string]: raceUpdate.accentColor }}
+                  >
+                    <div className="radio-note-head">
+                      <p className="radio-note-team">{raceUpdate.teamName}</p>
+                      <p className="radio-note-label">RADIO</p>
                     </div>
-                  );
-                })}
+                    <div className="radio-wave" aria-hidden="true">
+                      {Array.from({ length: 18 }).map((_, barIndex) => (
+                        <span key={`${raceUpdate.id}-wave-${barIndex}`} style={{ animationDelay: `${barIndex * 55}ms` }} />
+                      ))}
+                    </div>
+                    <p className="radio-note-message">&ldquo;{raceUpdate.message}&rdquo;</p>
+                    <p className="radio-note-sub">{raceUpdateSubtext}</p>
+                  </aside>
+                );
+              })}
+            </section>
+          ) : null}
+
+          {showBigClock ? (
+            <div className="arena-timer-column">
+              <div className="arena-timer-anchor">
+                <div className={`arena-clock-stack ${showPaused ? "arena-clock-stack--paused" : ""}`}>
+                  <div
+                    className={`race-clock arena-race-clock ${clockSeconds <= 10 && showRunning ? "urgent" : ""}`}
+                  >
+                    {timerLabel}
+                  </div>
+                </div>
+                {showPaused ? (
+                  <div
+                    className="arena-pause-band"
+                    role="group"
+                    aria-label="Session paused — safety car period"
+                  >
+                    <div className="arena-pause-band__stripe arena-pause-band__stripe--top" aria-hidden />
+                    <div className="arena-pause-band__body">
+                      <TrafficLights mode="yellow" />
+                      <button className="btn-primary arena-pause-band__resume" type="button" onClick={resumeLocalTimer}>
+                        Resume race
+                      </button>
+                    </div>
+                    <div className="arena-pause-band__stripe arena-pause-band__stripe--bottom" aria-hidden />
+                  </div>
+                ) : null}
+                {showEnded ? (
+                  <div className="arena-end-band" role="status" aria-live="polite">
+                    <div className="arena-end-band__stripe arena-end-band__stripe--top" aria-hidden />
+                    <div className="arena-end-band__body">
+                      <Image
+                        src="/chequeredflag.png"
+                        alt=""
+                        width={160}
+                        height={100}
+                        className="arena-end-band__flag"
+                        priority
+                      />
+                      <p className="arena-end-band__caption">SESSION COMPLETE</p>
+                      <Link className="btn-primary arena-end-band__next" href="/vote">
+                        Next
+                      </Link>
+                    </div>
+                    <div className="arena-end-band__stripe arena-end-band__stripe--bottom" aria-hidden />
+                  </div>
+                ) : null}
               </div>
-              {!teams.length ? <p className="start-marker-empty">No teams registered yet</p> : null}
-            </aside>
+              {showEnded ? (
+                <button type="button" className="btn-secondary arena-ended-new-session" onClick={resetLocalSession}>
+                  New session
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+
+          {showRunning ? (
+            <div className="timer-actions arena-controls">
+              <button type="button" className="btn-secondary" onClick={pauseLocalTimer}>
+                Pause timer
+              </button>
+              <button type="button" className="btn-secondary" onClick={() => addMinutes(5)}>
+                +5 min
+              </button>
+              <button type="button" className="btn-secondary" onClick={() => addMinutes(10)}>
+                +10 min
+              </button>
+            </div>
+          ) : null}
+
+          {loading && !data ? (
+            <p className="muted arena-hydrating">Loading team data for the circuit…</p>
+          ) : null}
+          {!loading && !data ? (
+            <div className="panel admin-state-fallback arena-state-fallback">
+              <p className="error-text">{error ?? "Could not load team data."}</p>
+              <p className="muted small">The session timer above still works. Retry to load the circuit map.</p>
+              <button type="button" className="btn-primary" onClick={() => void refresh()}>
+                Retry
+              </button>
+            </div>
           ) : null}
         </section>
-      </>
+
+        {circuitActive ? (
+          <aside className="circuit-side-card" aria-label="Circuit map panel">
+            <p className="kicker">Circuit</p>
+            <div className="map-wrap circuit-map-wrap">
+              <Image src="/circuit-placeholder.svg" alt="Circuit map" width={1400} height={880} className="map-image" priority />
+              {teams.map((team, index) => {
+                const point = getTrackPoint(team.progress);
+                return (
+                  <div
+                    className="start-marker-on-track"
+                    key={team.id}
+                    style={{
+                      left: `${(point.x / 1400) * 100}%`,
+                      top: `${(point.y / 880) * 100}%`,
+                      transform: `translate(-50%, -50%) translateY(${index * 2}px)`
+                    }}
+                  >
+                    <span
+                      className="start-marker-dot"
+                      style={{ backgroundColor: team.livery?.primaryColor ?? "#FFFFFF" }}
+                      aria-hidden="true"
+                    />
+                    <span className="start-marker-name">{team.name}</span>
+                  </div>
+                );
+              })}
+            </div>
+            {!teams.length ? <p className="start-marker-empty">No teams registered yet</p> : null}
+          </aside>
+        ) : null}
+      </section>
     </main>
   );
 }

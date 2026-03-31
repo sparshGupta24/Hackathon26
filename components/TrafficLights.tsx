@@ -41,13 +41,37 @@ export function TrafficLights({ intervalMs = 700, onComplete, mode = "start" }: 
     }, intervalMs * 6);
     timers.push(lightsOutTimer);
 
-    const doneTimer = window.setTimeout(() => {
+    /** Wall-clock deadline so onComplete still fires if the tab was backgrounded (long setTimeouts are throttled). */
+    const sequenceEndMs = intervalMs * 6 + 1200;
+    const startedAt = Date.now();
+    let completeFired = false;
+    const fireComplete = () => {
+      if (completeFired) {
+        return;
+      }
+      completeFired = true;
       onCompleteRef.current?.();
-    }, intervalMs * 6 + 1200);
-    timers.push(doneTimer);
+    };
+
+    const pollId = window.setInterval(() => {
+      if (Date.now() - startedAt >= sequenceEndMs) {
+        window.clearInterval(pollId);
+        fireComplete();
+      }
+    }, 250);
+
+    const onVisible = () => {
+      if (document.visibilityState === "visible" && Date.now() - startedAt >= sequenceEndMs) {
+        window.clearInterval(pollId);
+        fireComplete();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
 
     return () => {
-      timers.forEach((timer) => window.clearTimeout(timer));
+      document.removeEventListener("visibilitychange", onVisible);
+      timers.forEach((t) => window.clearTimeout(t));
+      window.clearInterval(pollId);
     };
   }, [intervalMs, mode]);
 
@@ -60,7 +84,11 @@ export function TrafficLights({ intervalMs = 700, onComplete, mode = "start" }: 
 
   return (
     <div className="traffic-lights-panel">
-      <div className="traffic-rig" role="img" aria-label="F1 start lights sequence">
+      <div
+        className="traffic-rig"
+        role="img"
+        aria-label={mode === "yellow" ? "Safety car — all yellow lights" : "F1 start lights sequence"}
+      >
         {lights.map((isOn, index) => (
           <div className="traffic-lamp-wrap" style={{ animationDelay: `${index * 120}ms` }} key={index}>
             <div className={isOn ? `traffic-lamp ${mode === "yellow" ? "yellow" : "on"}` : "traffic-lamp"} />

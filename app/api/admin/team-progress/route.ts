@@ -8,7 +8,7 @@ export async function POST(request: NextRequest) {
   const payload = await request.json().catch(() => null);
   const parsed = teamProgressSchema.safeParse(payload);
   if (!parsed.success) {
-    return badRequest("teamId, delta (+1/-1), and message are required");
+    return badRequest("teamId, delta (−10, 0, +10, or +20), and message are required");
   }
 
   try {

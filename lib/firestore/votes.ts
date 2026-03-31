@@ -1,7 +1,6 @@
 import { FieldValue } from "firebase-admin/firestore";
 import { getDb } from "@/lib/firebaseAdmin";
-import type { VoteCategoryId } from "@/lib/voteCategories";
-import { VOTE_CATEGORIES } from "@/lib/voteCategories";
+import { VOTE_CATEGORIES, type VoteCategoryId, isVoteCategoryId } from "@/lib/voteCategories";
 import type { TeamState } from "@/lib/types";
 import type { VoteTallies, VoteTallyEntry } from "@/lib/voteTally";
 import { VOTE_ENFORCE_SINGLE_BALLOT_PER_DEVICE } from "@/lib/voteConfig";
@@ -10,8 +9,11 @@ const COL_VOTES = "audienceVotes";
 
 export type { VoteTallies, VoteTallyEntry } from "@/lib/voteTally";
 
-function isVoteCategoryId(s: string): s is VoteCategoryId {
-  return VOTE_CATEGORIES.some((c) => c.id === s);
+function emptyCategoryMaps(): Record<VoteCategoryId, Map<string, { teamId: string; count: number }>> {
+  return Object.fromEntries(VOTE_CATEGORIES.map((c) => [c.id, new Map()])) as Record<
+    VoteCategoryId,
+    Map<string, { teamId: string; count: number }>
+  >;
 }
 
 export async function hasVoterSubmitted(voterId: string): Promise<boolean> {
@@ -19,72 +21,65 @@ export async function hasVoterSubmitted(voterId: string): Promise<boolean> {
     return false;
   }
   const db = getDb();
-  const snap = await db.collection(COL_VOTES).doc(`${voterId}__gunner`).get();
+  const first = VOTE_CATEGORIES[0]!.id;
+  const snap = await db.collection(COL_VOTES).doc(`${voterId}__${first}`).get();
   return snap.exists;
 }
 
-export async function submitVotePair(input: {
+export async function submitVoteBallot(input: {
   voterId: string;
-  gunner: { playerId: string; teamId: string };
-  ripper: { playerId: string; teamId: string };
+  votes: Record<VoteCategoryId, { playerId: string; teamId: string }>;
 }): Promise<void> {
   const db = getDb();
   const now = FieldValue.serverTimestamp();
-  const base = {
-    voterId: input.voterId,
-    createdAt: now
-  };
+  const baseVoter = { voterId: input.voterId, createdAt: now };
+
+  for (const c of VOTE_CATEGORIES) {
+    const v = input.votes[c.id];
+    if (!v?.playerId || !v?.teamId) {
+      throw new Error("INCOMPLETE_BALLOT");
+    }
+  }
 
   if (VOTE_ENFORCE_SINGLE_BALLOT_PER_DEVICE) {
-    const gRef = db.collection(COL_VOTES).doc(`${input.voterId}__gunner`);
-    const rRef = db.collection(COL_VOTES).doc(`${input.voterId}__ripper`);
-
+    const refs = VOTE_CATEGORIES.map((c) => db.collection(COL_VOTES).doc(`${input.voterId}__${c.id}`));
     await db.runTransaction(async (tx) => {
-      const [gSnap, rSnap] = await Promise.all([tx.get(gRef), tx.get(rRef)]);
-      if (gSnap.exists || rSnap.exists) {
+      const snaps = await Promise.all(refs.map((r) => tx.get(r)));
+      if (snaps.some((s) => s.exists)) {
         throw new Error("ALREADY_VOTED");
       }
-      tx.set(gRef, {
-        ...base,
-        category: "gunner",
-        playerId: input.gunner.playerId,
-        teamId: input.gunner.teamId
-      });
-      tx.set(rRef, {
-        ...base,
-        category: "ripper",
-        playerId: input.ripper.playerId,
-        teamId: input.ripper.teamId
-      });
+      for (let i = 0; i < VOTE_CATEGORIES.length; i++) {
+        const cat = VOTE_CATEGORIES[i]!;
+        const sel = input.votes[cat.id];
+        tx.set(refs[i]!, {
+          ...baseVoter,
+          category: cat.id,
+          playerId: sel.playerId,
+          teamId: sel.teamId
+        });
+      }
     });
     return;
   }
 
   const batch = db.batch();
-  const gRef = db.collection(COL_VOTES).doc();
-  const rRef = db.collection(COL_VOTES).doc();
-  batch.set(gRef, {
-    ...base,
-    category: "gunner",
-    playerId: input.gunner.playerId,
-    teamId: input.gunner.teamId
-  });
-  batch.set(rRef, {
-    ...base,
-    category: "ripper",
-    playerId: input.ripper.playerId,
-    teamId: input.ripper.teamId
-  });
+  for (const c of VOTE_CATEGORIES) {
+    const sel = input.votes[c.id];
+    const ref = db.collection(COL_VOTES).doc();
+    batch.set(ref, {
+      ...baseVoter,
+      category: c.id,
+      playerId: sel.playerId,
+      teamId: sel.teamId
+    });
+  }
   await batch.commit();
 }
 
 export async function getVoteTallies(): Promise<VoteTallies> {
   const db = getDb();
   const snap = await db.collection(COL_VOTES).get();
-  const counts: Record<VoteCategoryId, Map<string, { teamId: string; count: number }>> = {
-    gunner: new Map(),
-    ripper: new Map()
-  };
+  const counts = emptyCategoryMaps();
 
   for (const doc of snap.docs) {
     const d = doc.data();
@@ -108,12 +103,12 @@ export async function getVoteTallies(): Promise<VoteTallies> {
       })
       .sort((a, b) => b.count - a.count);
 
-  return {
-    byCategory: {
-      gunner: toSorted(counts.gunner),
-      ripper: toSorted(counts.ripper)
-    }
-  };
+  const byCategory = {} as VoteTallies["byCategory"];
+  for (const c of VOTE_CATEGORIES) {
+    byCategory[c.id] = toSorted(counts[c.id]);
+  }
+
+  return { byCategory };
 }
 
 /** Any roster player on a registered team may receive a vote in any category. */
@@ -123,22 +118,4 @@ export function validateVoteTeamMember(teams: TeamState[], playerId: string, tea
     return false;
   }
   return team.players.some((pl) => pl.id === playerId);
-}
-
-export function validateVoteAgainstTeams(
-  teams: TeamState[],
-  category: VoteCategoryId,
-  playerId: string,
-  teamId: string
-): boolean {
-  const roleTitle = VOTE_CATEGORIES.find((c) => c.id === category)?.roleTitle;
-  if (!roleTitle) {
-    return false;
-  }
-  const team = teams.find((t) => t.id === teamId);
-  if (!team) {
-    return false;
-  }
-  const p = team.players.find((pl) => pl.id === playerId);
-  return Boolean(p && p.roleTitle === roleTitle);
 }

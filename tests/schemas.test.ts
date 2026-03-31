@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { registrationSchema, timerExtendSchema } from "@/lib/schemas";
+import { challengePromptSchema, registrationSchema, timerExtendSchema } from "@/lib/schemas";
 
 describe("registration schema", () => {
   it("accepts a valid registration payload", () => {
@@ -68,5 +68,33 @@ describe("registration schema", () => {
     expect(timerExtendSchema.safeParse({ minutes: 5 }).success).toBe(true);
     expect(timerExtendSchema.safeParse({ minutes: 10 }).success).toBe(true);
     expect(timerExtendSchema.safeParse({ minutes: 7 }).success).toBe(false);
+  });
+});
+
+describe("challenge prompt schema", () => {
+  it("accepts a valid payload", () => {
+    const result = challengePromptSchema.safeParse({
+      teamId: "abc123",
+      prompt: "A rubber duck needs to Run a live auction for A crew of elite Navy SEALs",
+      spinsUsed: 2
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects spinsUsed out of range", () => {
+    expect(
+      challengePromptSchema.safeParse({
+        teamId: "x",
+        prompt: "A golden retriever needs to Assign and track tasks for A panel of Fortune 500 CEOs",
+        spinsUsed: 0
+      }).success
+    ).toBe(false);
+    expect(
+      challengePromptSchema.safeParse({
+        teamId: "x",
+        prompt: "A golden retriever needs to Assign and track tasks for A panel of Fortune 500 CEOs",
+        spinsUsed: 4
+      }).success
+    ).toBe(false);
   });
 });

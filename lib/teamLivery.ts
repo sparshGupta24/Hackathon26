@@ -1,4 +1,21 @@
-import type { LiveryState } from "@/lib/types";
+import { parseCarTemplateId, type CarTemplateId } from "./carSvgs";
+import type { LiveryState, TeamState } from "./types";
+
+export const FALLBACK_LIVERY: LiveryState = {
+  carTemplate: "01",
+  primaryColor: "#3a3a42",
+  secondaryColor: "#1a1a1f",
+  tertiaryColor: "#6b6b78",
+  carNumber: 0
+};
+
+export function liveryForTeam(team: TeamState): { templateId: CarTemplateId; livery: LiveryState } {
+  const livery = team.livery ?? FALLBACK_LIVERY;
+  return {
+    templateId: parseCarTemplateId(livery.carTemplate) ?? "01",
+    livery
+  };
+}
 
 function hexToRgb(hex: string) {
   const cleaned = hex.replace("#", "");

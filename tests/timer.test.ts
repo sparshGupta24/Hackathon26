@@ -45,6 +45,17 @@ describe("timer utilities", () => {
     expect(done).toBe(true);
   });
 
+  it("does not auto-end while running with no start time (corrupt doc)", () => {
+    expect(
+      shouldAutoEnd({
+        status: "running",
+        startedAt: null,
+        baseDurationSec: 60,
+        extendedSec: 0
+      })
+    ).toBe(false);
+  });
+
   it("formats mm:ss labels", () => {
     expect(formatTimerLabel(0)).toBe("00:00");
     expect(formatTimerLabel(125)).toBe("02:05");

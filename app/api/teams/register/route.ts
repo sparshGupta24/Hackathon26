@@ -33,14 +33,14 @@ export async function POST(request: Request) {
       return badRequest(parsed.error.issues[0]?.message ?? "Invalid registration payload");
     }
 
-    await registerTeam({
+    const teamId = await registerTeam({
       teamName: parsed.data.teamName,
       playerIds: parsed.data.playerIds,
       livery: parsed.data.livery
     });
 
     const state = await getEventState();
-    return NextResponse.json({ ok: true, state }, { status: 201 });
+    return NextResponse.json({ ok: true, teamId, state }, { status: 201 });
   } catch (error) {
     if (error instanceof Error && error.message === "TEAM_LIMIT_REACHED") {
       return badRequest("Registration is closed. Six teams have already registered.");
