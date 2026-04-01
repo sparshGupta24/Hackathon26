@@ -79,6 +79,14 @@ function candidateKey(c: Candidate): string {
   return `${c.teamId}-${c.playerId}`;
 }
 
+/** Fisher–Yates shuffle in place (unbiased). */
+function shuffleInPlace<T>(arr: T[]): void {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+}
+
 function isSameSelection(a: Selection, c: Candidate): boolean {
   return Boolean(a && a.playerId === c.playerId && a.teamId === c.teamId);
 }
@@ -135,8 +143,20 @@ export default function VotePage() {
   }, [voterId, checkStatus]);
 
   const teams = data?.teams ?? [];
-  const choices = useMemo(() => allTeamCandidates(teams), [teams]);
-  const teamsWithPlayers = useMemo(() => playersByTeam(teams), [teams]);
+  const teamIdsKey = useMemo(() => teams.map((t) => t.id).sort().join("|"), [teams]);
+  /** Random order per visit; stable while the same set of team ids is shown. */
+  const teamDisplayOrder = useMemo(() => {
+    const ids = teams.map((t) => t.id);
+    shuffleInPlace(ids);
+    return ids;
+  }, [teamIdsKey]);
+  const orderedTeams = useMemo(() => {
+    const byId = new Map(teams.map((t) => [t.id, t] as const));
+    return teamDisplayOrder.map((id) => byId.get(id)).filter((t): t is TeamState => t != null);
+  }, [teams, teamDisplayOrder]);
+
+  const choices = useMemo(() => allTeamCandidates(orderedTeams), [orderedTeams]);
+  const teamsWithPlayers = useMemo(() => playersByTeam(orderedTeams), [orderedTeams]);
   const categoryId = STEPS[stepIndex]!;
   const categoryMeta = VOTE_CATEGORIES.find((c) => c.id === categoryId)!;
   const selectionForStep = selections[categoryId];
@@ -147,7 +167,7 @@ export default function VotePage() {
       !error &&
       statusChecked &&
       !(hasVoted && VOTE_ENFORCE_SINGLE_BALLOT_PER_DEVICE) &&
-      teams.length > 0 &&
+      orderedTeams.length > 0 &&
       choices.length > 0
   );
 
@@ -289,7 +309,7 @@ export default function VotePage() {
             Back to home
           </Link>
         </section>
-      ) : !teams.length ? (
+      ) : !orderedTeams.length ? (
         <p className="panel">No teams registered yet. Check back after registration.</p>
       ) : !choices.length ? (
         <p className="panel">No players on registered teams yet.</p>
