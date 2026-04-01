@@ -6183,8 +6183,8 @@ span.team-award-roster-avatar.team-award-roster-fallback {
 }
 
 .mission-reveal-row-item {
-  flex: 0 0 min(360px, 78vw);
-  max-width: min(360px, 78vw);
+  flex: 0 0 min(420px, 88vw);
+  max-width: min(420px, 88vw);
   scroll-snap-align: start;
 }
 
@@ -6197,7 +6197,7 @@ span.team-award-roster-avatar.team-award-roster-fallback {
 }
 
 .mission-reveal-flip-card.team-award-flip-card {
-  height: clamp(520px, 72vh, 700px);
+  height: clamp(560px, 78vh, 760px);
 }
 
 .mission-reveal-team-title {
@@ -6241,12 +6241,13 @@ span.team-award-roster-avatar.team-award-roster-fallback {
 
 .mission-reveal-livery.team-award-winner-livery {
   width: 100%;
-  max-width: min(280px, 92%);
-  flex: 0 1 auto;
-  min-height: 0;
-  height: clamp(132px, 24vh, 188px);
-  margin-top: 0.45rem;
-  overflow: hidden;
+  max-width: min(400px, 100%);
+  flex: 1 1 auto;
+  min-height: clamp(220px, 34vh, 340px);
+  height: clamp(220px, 34vh, 340px);
+  margin-top: 0.5rem;
+  margin-bottom: 0.25rem;
+  overflow: visible;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -6260,14 +6261,23 @@ span.team-award-roster-avatar.team-award-roster-fallback {
 
 .mission-reveal-livery.team-award-winner-livery .f1-car-svg-wrap {
   max-height: 100%;
-  overflow: hidden;
+  overflow: visible;
+}
+
+.mission-reveal-livery.team-award-winner-livery .f1-car-svg {
+  width: 100%;
+  min-height: clamp(200px, 30vh, 300px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .mission-reveal-livery.team-award-winner-livery .f1-car-svg svg,
 .mission-reveal-livery.team-award-winner-livery .f1-car-raster {
-  max-height: clamp(124px, 22vh, 180px);
-  width: auto;
+  width: 100%;
   max-width: 100%;
+  height: auto;
+  max-height: min(340px, 36vh);
   margin: 0 auto;
   display: block;
 }
@@ -6304,6 +6314,11 @@ span.team-award-roster-avatar.team-award-roster-fallback {
   white-space: pre-wrap;
   word-break: break-word;
   color: var(--ink);
+}
+
+.mission-reveal-section--solo {
+  flex: 1;
+  min-height: 0;
 }
 
 .mission-reveal-front.team-award-flip-front--clickable:disabled {

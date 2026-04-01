@@ -29,7 +29,6 @@ function liveryFor(team: TeamState): { templateId: CarTemplateId; livery: Livery
 export function MissionRevealCard({ team }: { team: TeamState }) {
   const [flipped, setFlipped] = useState(false);
   const { templateId, livery } = liveryFor(team);
-  const promptText = team.challengePrompt?.trim();
   const missionText = team.missionStatement?.trim();
 
   return (
@@ -43,7 +42,7 @@ export function MissionRevealCard({ team }: { team: TeamState }) {
             className="team-award-flip-face team-award-flip-front team-award-flip-front--clickable mission-reveal-front"
             onClick={() => setFlipped(true)}
             disabled={flipped}
-            aria-label={`Reveal prompt and mission for ${team.name}`}
+            aria-label={`Reveal mission statement for ${team.name}`}
           >
             <p className="team-award-kicker">Team</p>
             <h2 className="team-award-category-title mission-reveal-team-title">{team.name}</h2>
@@ -85,22 +84,12 @@ export function MissionRevealCard({ team }: { team: TeamState }) {
                 carNumber={livery.carNumber}
               />
             </div>
-            <p className="team-award-reveal-hint">Click to reveal prompt &amp; mission</p>
+            <p className="team-award-reveal-hint">Click to reveal mission</p>
           </button>
 
           <div className="team-award-flip-face team-award-flip-back mission-reveal-back">
             <div className="team-award-back-body mission-reveal-back-body">
-              <section className="mission-reveal-section">
-                <h3 className="mission-reveal-section-title">Challenge prompt</h3>
-                <p className="mission-reveal-section-text">
-                  {promptText ? (
-                    <>&ldquo;{promptText}&rdquo;</>
-                  ) : (
-                    <span className="muted">No challenge prompt set for this team yet.</span>
-                  )}
-                </p>
-              </section>
-              <section className="mission-reveal-section">
+              <section className="mission-reveal-section mission-reveal-section--solo">
                 <h3 className="mission-reveal-section-title">Mission statement</h3>
                 <p className="mission-reveal-section-text">
                   {missionText ? (
