@@ -640,6 +640,14 @@ a {
   max-width: min(40vw, 160px);
 }
 
+.event-brand-pair--regulation {
+  --event-brand-logo-h: clamp(48px, 10vw, 72px);
+}
+
+.event-brand-pair--regulation .event-brand-pair__mark {
+  max-width: min(42vw, 180px);
+}
+
 .event-brand-pair--reg-thanks {
   --event-brand-logo-h: clamp(48px, 11vw, 72px);
 }
@@ -3038,6 +3046,17 @@ select {
   font-weight: 600;
 }
 
+/* Slot 1 — Slot 2 — Lever (registration hides third reel but still draws full row) */
+.pg-slot-machine--two-reels .pg-slot-labels-row {
+  grid-template-columns:
+    minmax(0, 1.05fr) auto minmax(0, 1.15fr) minmax(5.25rem, 6.75rem);
+}
+
+.pg-slot-machine--two-reels .pg-slot-machine-row {
+  grid-template-columns:
+    minmax(0, 1.05fr) auto minmax(0, 1.15fr) minmax(5.25rem, 6.75rem);
+}
+
 /* Slot 1 — needs to — Slot 2 — for — Slot 3 — Lever */
 .pg-slot-machine-row {
   display: grid;
@@ -4434,6 +4453,10 @@ select {
     grid-template-columns: 1fr auto 1fr auto 1fr;
     gap: 0.35rem 0.25rem;
     margin-bottom: 0.5rem;
+  }
+
+  .pg-slot-machine--two-reels .pg-slot-labels-row {
+    grid-template-columns: 1fr auto 1fr;
   }
 
   .pg-slot-labels-lever-gap {
@@ -6324,4 +6347,185 @@ span.team-award-roster-avatar.team-award-roster-fallback {
 .mission-reveal-front.team-award-flip-front--clickable:disabled {
   cursor: default;
   opacity: 1;
+}
+
+/* —— Regulation changes (/regulationchanges) —— grid of flip cards, slot 3 (direction) on back */
+.regulation-changes-page {
+  max-width: min(1200px, 100%);
+  margin: 0 auto;
+  padding: 2rem 1rem 3rem;
+}
+
+.regulation-changes-header {
+  text-align: center;
+  margin-bottom: clamp(1.5rem, 4vw, 2.25rem);
+}
+
+.regulation-changes-brand {
+  display: flex;
+  justify-content: center;
+  padding: 0.5rem 0 1rem;
+}
+
+.regulation-changes-header h1 {
+  margin: 0;
+  font-family: var(--font-heading), sans-serif;
+  font-size: clamp(1.35rem, 3.2vw, 1.85rem);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.regulation-changes-loading,
+.regulation-changes-fallback {
+  max-width: 36rem;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.regulation-changes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+  gap: 1.25rem;
+  align-items: stretch;
+}
+
+.regulation-changes-grid-cell {
+  min-width: 0;
+}
+
+.regulation-change-slot {
+  width: 100%;
+  height: 100%;
+}
+
+.regulation-change-flip-scene {
+  width: 100%;
+}
+
+.regulation-change-flip-card.team-award-flip-card {
+  height: clamp(400px, 52vh, 540px);
+}
+
+.regulation-change-front {
+  gap: 0.65rem;
+}
+
+.regulation-change-team-title {
+  margin: 0;
+  font-family: var(--font-heading), sans-serif;
+  font-size: clamp(1rem, 2.4vw, 1.2rem);
+  font-weight: 700;
+  line-height: 1.2;
+  text-wrap: balance;
+}
+
+.regulation-change-livery {
+  width: 100%;
+  max-width: 280px;
+  flex: 1 1 auto;
+  min-height: clamp(100px, 22vw, 160px);
+  max-height: clamp(120px, 26vw, 180px);
+  margin: 0.15rem 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: visible;
+}
+
+.regulation-change-livery .f1-car-shell {
+  width: 100%;
+  max-height: 100%;
+  margin-top: 0;
+}
+
+.regulation-change-livery .f1-car-svg-wrap {
+  max-height: 100%;
+  overflow: visible;
+}
+
+.regulation-change-livery .f1-car-svg {
+  width: 100%;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.regulation-change-livery .f1-car-svg svg,
+.regulation-change-livery .f1-car-raster {
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  max-height: clamp(100px, 24vw, 170px);
+  margin: 0 auto;
+  display: block;
+}
+
+.regulation-change-roster {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.35rem;
+  max-width: 100%;
+}
+
+.regulation-change-avatar-wrap {
+  flex-shrink: 0;
+}
+
+.regulation-change-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  box-sizing: border-box;
+  border: 2px solid rgba(255, 255, 255, 0.12);
+}
+
+.regulation-change-avatar--fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(80, 90, 110, 0.45);
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.regulation-change-hint {
+  margin-top: auto;
+  margin-bottom: 0;
+  padding-top: 0.35rem;
+}
+
+.regulation-change-back-body {
+  justify-content: center;
+  gap: 0.85rem;
+  padding: 1.35rem 1.1rem 0.75rem;
+}
+
+.regulation-change-exclaim {
+  margin: 0;
+  font-family: var(--font-heading), sans-serif;
+  font-size: clamp(3rem, 14vw, 4.25rem);
+  font-weight: 900;
+  line-height: 1;
+  color: color-mix(in srgb, var(--accent) 92%, white);
+  text-shadow: 0 0 28px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+.regulation-change-direction-text {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  text-align: center;
+  text-wrap: balance;
+  word-break: break-word;
+  color: var(--ink);
+}
+
+@media (min-width: 960px) {
+  .regulation-changes-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
 }

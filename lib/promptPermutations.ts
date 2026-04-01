@@ -54,3 +54,26 @@ export function composeRegistrationPrompt(index: number): string {
 export function isValidPermutationIndex(n: unknown): n is number {
   return typeof n === "number" && Number.isInteger(n) && n >= 0 && n < PROMPT_PERMUTATION_COUNT;
 }
+
+/** Slot 3 (direction line) saved at registration; from index or by parsing `challengePrompt`. */
+export function registrationDirectionForTeam(team: {
+  challengePrompt?: string;
+  promptPermutationIndex?: number;
+}): string | null {
+  if (isValidPermutationIndex(team.promptPermutationIndex)) {
+    const line = REGISTRATION_SLOT_DIRECTION[team.promptPermutationIndex];
+    if (line !== undefined) {
+      return line;
+    }
+  }
+  const raw = team.challengePrompt?.trim();
+  if (!raw) {
+    return null;
+  }
+  const parts = raw.split(" — ");
+  if (parts.length < 3) {
+    return null;
+  }
+  const joined = parts.slice(2).join(" — ").trim();
+  return joined || null;
+}

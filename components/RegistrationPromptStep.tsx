@@ -42,7 +42,8 @@ export function RegistrationPromptStep({
       return;
     }
     setPermutationIndex(result.permutationIndex);
-    setPreviewPrompt(result.prompt);
+    const parts = result.prompt.split(" — ");
+    setPreviewPrompt(parts.slice(0, 2).join(" — "));
     setError(null);
   }, []);
 
@@ -87,8 +88,9 @@ export function RegistrationPromptStep({
         <p className="kicker">Step 2 of 2</p>
         <h2 className="reg-prompt-step-title">Challenge prompt</h2>
         <p className="muted small">
-          <strong>{teamName}</strong> — one spin only. All three slots use the same row (users, context, and direction
-          stay in sync). Each row can only be assigned once across all teams ({PROMPT_PERMUTATION_COUNT} total).
+          <strong>{teamName}</strong> — one spin only. You see <strong>users</strong> and <strong>context</strong>; the
+          full challenge row (including direction) is saved for the event but only the first two parts are shown here.
+          Each row can only be assigned once across all teams ({PROMPT_PERMUTATION_COUNT} total).
         </p>
         {noRowsLeft ? (
           <p className="error-text reg-prompt-error">
@@ -112,6 +114,7 @@ export function RegistrationPromptStep({
         allowedIndices={availablePermutationIndices}
         columnLabels={COLUMN_LABELS}
         connectorStyle="dash"
+        hideThirdReel
       />
 
       {previewPrompt && spinDone ? (

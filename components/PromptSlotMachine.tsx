@@ -59,6 +59,8 @@ export type PromptSlotMachineProps = {
   columnLabels?: readonly [string, string, string];
   /** Registration uses em-dash separators; generator uses phrase glue. */
   connectorStyle?: "phrase" | "dash";
+  /** Hide reel 3 and readout text for slot 3; still picks & reports full row (e.g. registration). */
+  hideThirdReel?: boolean;
 };
 
 export function PromptSlotMachine({
@@ -71,7 +73,8 @@ export function PromptSlotMachine({
   synchronized = false,
   allowedIndices,
   columnLabels,
-  connectorStyle = "phrase"
+  connectorStyle = "phrase",
+  hideThirdReel = false
 }: PromptSlotMachineProps) {
   const [rowOne, setRowOne] = useState<string>(slotOne[0] ?? "");
   const [rowTwo, setRowTwo] = useState<string>(slotTwo[0] ?? "");
@@ -249,9 +252,14 @@ export function PromptSlotMachine({
   }
 
   const registrationClass = columnLabels ? " pg-slot-machine--registration" : "";
+  const twoReelOnly = Boolean(hideThirdReel);
 
   return (
-    <section className={["panel pg-slot-machine", registrationClass, className].filter(Boolean).join(" ")}>
+    <section
+      className={["panel pg-slot-machine", registrationClass, twoReelOnly ? "pg-slot-machine--two-reels" : "", className]
+        .filter(Boolean)
+        .join(" ")}
+    >
       <div className="pg-slot-chrome">
         <div className="pg-slot-lamps" aria-hidden />
         {columnLabels ? (
@@ -259,8 +267,12 @@ export function PromptSlotMachine({
             <span className="pg-slot-col-label">{columnLabels[0]}</span>
             <span className="pg-slot-label-sep">--</span>
             <span className="pg-slot-col-label">{columnLabels[1]}</span>
-            <span className="pg-slot-label-sep">--</span>
-            <span className="pg-slot-col-label">{columnLabels[2]}</span>
+            {!twoReelOnly ? (
+              <>
+                <span className="pg-slot-label-sep">--</span>
+                <span className="pg-slot-col-label">{columnLabels[2]}</span>
+              </>
+            ) : null}
             <div className="pg-slot-labels-lever-gap" />
           </div>
         ) : null}
@@ -299,27 +311,31 @@ export function PromptSlotMachine({
               </div>
             </div>
           </div>
-          {connectorStyle === "dash" ? (
-            <div className="pg-slot-connector pg-slot-connector--dash" aria-hidden>
-              --
-            </div>
-          ) : (
-            <div className="pg-slot-connector pg-slot-connector--stack">
-              <span className="pg-slot-connector-line">for</span>
-            </div>
-          )}
-          <div className={`pg-reel ${spinning ? "pg-reel--spinning" : ""} ${doorsOpen ? "pg-reel--doors-open" : ""}`}>
-            <div className="pg-reel-door" aria-hidden />
-            <div ref={reelRefs[2]} className="pg-reel-window">
-              <div className="pg-reel-strip">
-                {strip3.map((text, idx) => (
-                  <div key={`s3-${idx}`} className="pg-reel-item">
-                    {text}
+          {!twoReelOnly ? (
+            <>
+              {connectorStyle === "dash" ? (
+                <div className="pg-slot-connector pg-slot-connector--dash" aria-hidden>
+                  --
+                </div>
+              ) : (
+                <div className="pg-slot-connector pg-slot-connector--stack">
+                  <span className="pg-slot-connector-line">for</span>
+                </div>
+              )}
+              <div className={`pg-reel ${spinning ? "pg-reel--spinning" : ""} ${doorsOpen ? "pg-reel--doors-open" : ""}`}>
+                <div className="pg-reel-door" aria-hidden />
+                <div ref={reelRefs[2]} className="pg-reel-window">
+                  <div className="pg-reel-strip">
+                    {strip3.map((text, idx) => (
+                      <div key={`s3-${idx}`} className="pg-reel-item">
+                        {text}
+                      </div>
+                    ))}
                   </div>
-                ))}
+                </div>
               </div>
-            </div>
-          </div>
+            </>
+          ) : null}
           <div className="pg-am-lever-column">
             <div className="pg-am-lever-host">
               <button
@@ -348,16 +364,25 @@ export function PromptSlotMachine({
           <strong className="pg-slot-readout-slot">{rowOne}</strong>
           <span className="pg-slot-readout-glue"> — </span>
           <strong className="pg-slot-readout-slot">{rowTwo}</strong>
-          <span className="pg-slot-readout-glue"> — </span>
-          <strong className="pg-slot-readout-slot">{rowThree}</strong>
+          {!twoReelOnly ? (
+            <>
+              <span className="pg-slot-readout-glue"> — </span>
+              <strong className="pg-slot-readout-slot">{rowThree}</strong>
+            </>
+          ) : null}
         </p>
       ) : (
         <p className="pg-slot-readout">
           <strong className="pg-slot-readout-slot">{leadLower(rowOne)}</strong>{" "}
           <span className="pg-slot-readout-glue">needs to</span>{" "}
-          <strong className="pg-slot-readout-slot">{leadLower(rowTwo)}</strong>{" "}
-          <span className="pg-slot-readout-glue">for</span>{" "}
-          <strong className="pg-slot-readout-slot">{leadLower(rowThree)}</strong>
+          <strong className="pg-slot-readout-slot">{leadLower(rowTwo)}</strong>
+          {!twoReelOnly ? (
+            <>
+              {" "}
+              <span className="pg-slot-readout-glue">for</span>{" "}
+              <strong className="pg-slot-readout-slot">{leadLower(rowThree)}</strong>
+            </>
+          ) : null}
         </p>
       )}
     </section>

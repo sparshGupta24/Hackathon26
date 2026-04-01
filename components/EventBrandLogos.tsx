@@ -6,6 +6,7 @@ export type EventBrandLogosVariant =
   | "formation"
   | "home"
   | "reg"
+  | "regulation"
   | "sessionSlide"
   | "waiting";
 
@@ -15,6 +16,7 @@ const VARIANT_MODIFIER: Record<EventBrandLogosVariant, string> = {
   formation: "event-brand-pair--formation",
   home: "event-brand-pair--home",
   reg: "event-brand-pair--reg",
+  regulation: "event-brand-pair--regulation",
   sessionSlide: "event-brand-pair--session-slide",
   waiting: "event-brand-pair--waiting"
 };
