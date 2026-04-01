@@ -1,43 +1,54 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { PromptSlotMachine } from "@/components/PromptSlotMachine";
+import { PromptSlotMachine, type PromptSlotSpinResult } from "@/components/PromptSlotMachine";
+import {
+  PROMPT_PERMUTATION_COUNT,
+  REGISTRATION_SLOT_CONTEXT,
+  REGISTRATION_SLOT_DIRECTION,
+  REGISTRATION_SLOT_USERS
+} from "@/lib/promptPermutations";
 
-const MAX_SPINS = 3;
+const COLUMN_LABELS = ["Your users", "Your context", "Your direction"] as const;
 
 export function RegistrationPromptStep({
   teamId,
   teamName,
   disabled,
+  availablePermutationIndices,
+  onRefreshState,
   onDone
 }: {
   teamId: string;
   teamName: string;
   disabled?: boolean;
+  /** Row indices 0..PROMPT_PERMUTATION_COUNT-1 not yet claimed by any team. */
+  availablePermutationIndices: number[];
+  onRefreshState: () => void | Promise<void>;
   onDone: () => void;
 }) {
-  const [prompts, setPrompts] = useState<string[]>([]);
-  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const [permutationIndex, setPermutationIndex] = useState<number | null>(null);
+  const [previewPrompt, setPreviewPrompt] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [machineNonce, setMachineNonce] = useState(0);
 
-  const spinsLeft = MAX_SPINS - prompts.length;
-  const leverDisabled = disabled || prompts.length >= MAX_SPINS;
+  const noRowsLeft = availablePermutationIndices.length === 0;
+  const spinDone = permutationIndex !== null;
+  const leverLocked = disabled || noRowsLeft || spinDone;
 
-  const onSpinComplete = useCallback((prompt: string) => {
-    setPrompts((prev) => {
-      if (prev.length >= MAX_SPINS) {
-        return prev;
-      }
-      const next = [...prev, prompt];
-      setSelectedIndex(next.length - 1);
-      return next;
-    });
+  const onSpinComplete = useCallback((result: PromptSlotSpinResult) => {
+    if (result.permutationIndex === undefined) {
+      return;
+    }
+    setPermutationIndex(result.permutationIndex);
+    setPreviewPrompt(result.prompt);
+    setError(null);
   }, []);
 
   async function handleFinalize() {
-    if (selectedIndex === null || !prompts[selectedIndex]) {
-      setError("Choose one of your generated prompts.");
+    if (permutationIndex === null) {
+      setError("Pull the lever once to draw your prompt row.");
       return;
     }
     setSaving(true);
@@ -48,13 +59,19 @@ export function RegistrationPromptStep({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           teamId,
-          prompt: prompts[selectedIndex],
-          spinsUsed: prompts.length
+          permutationIndex
         })
       });
       const payload = (await response.json()) as { error?: string };
       if (!response.ok) {
-        throw new Error(payload.error ?? "Failed to save prompt");
+        const msg = payload.error ?? "Failed to save prompt";
+        if (msg.toLowerCase().includes("just claimed") || msg.toLowerCase().includes("another team")) {
+          await onRefreshState();
+          setPermutationIndex(null);
+          setPreviewPrompt(null);
+          setMachineNonce((n) => n + 1);
+        }
+        throw new Error(msg);
       }
       onDone();
     } catch (err) {
@@ -70,50 +87,39 @@ export function RegistrationPromptStep({
         <p className="kicker">Step 2 of 2</p>
         <h2 className="reg-prompt-step-title">Challenge prompt</h2>
         <p className="muted small">
-          <strong>{teamName}</strong> — spin up to {MAX_SPINS} times, then pick one prompt to attach to your team.
+          <strong>{teamName}</strong> — one spin only. All three slots use the same row (users, context, and direction
+          stay in sync). Each row can only be assigned once across all teams ({PROMPT_PERMUTATION_COUNT} total).
         </p>
-        <p className="reg-prompt-spins muted small">
-          Spins used: {prompts.length} / {MAX_SPINS}
-          {spinsLeft > 0 ? ` · ${spinsLeft} left` : " · use a prompt below"}
-        </p>
+        {noRowsLeft ? (
+          <p className="error-text reg-prompt-error">
+            Every prompt row is already taken. Ask an organizer to free or extend the pool.
+          </p>
+        ) : (
+          <p className="reg-prompt-spins muted small">
+            Rows left for new teams: {availablePermutationIndices.length} / {PROMPT_PERMUTATION_COUNT}
+          </p>
+        )}
       </div>
 
-      <PromptSlotMachine leverDisabled={leverDisabled} onSpinComplete={onSpinComplete} />
+      <PromptSlotMachine
+        key={machineNonce}
+        leverDisabled={leverLocked}
+        onSpinComplete={onSpinComplete}
+        slotOne={REGISTRATION_SLOT_USERS}
+        slotTwo={REGISTRATION_SLOT_CONTEXT}
+        slotThree={REGISTRATION_SLOT_DIRECTION}
+        synchronized
+        allowedIndices={availablePermutationIndices}
+        columnLabels={COLUMN_LABELS}
+        connectorStyle="dash"
+      />
 
-      <fieldset className="reg-prompt-picks panel">
-        <legend className="reg-prompt-picks-legend">Choose your prompt</legend>
-        <div className="reg-prompt-cards" role="radiogroup" aria-label="Generated prompts">
-          {[0, 1, 2].map((idx) => {
-            const text = prompts[idx];
-            const filled = text !== undefined;
-            return (
-              <button
-                key={idx}
-                type="button"
-                role="radio"
-                aria-checked={selectedIndex === idx}
-                aria-disabled={!filled}
-                disabled={!filled}
-                className={[
-                  "reg-prompt-card",
-                  filled ? "" : "reg-prompt-card--empty",
-                  selectedIndex === idx && filled ? "reg-prompt-card--selected" : ""
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
-                onClick={() => {
-                  if (filled) {
-                    setSelectedIndex(idx);
-                  }
-                }}
-              >
-                <span className="reg-prompt-card-label">Prompt {idx + 1}</span>
-                <span className="reg-prompt-card-body">{filled ? text : "???"}</span>
-              </button>
-            );
-          })}
+      {previewPrompt && spinDone ? (
+        <div className="reg-prompt-single-pick panel">
+          <p className="reg-prompt-single-pick-label">Your challenge prompt</p>
+          <p className="reg-prompt-single-pick-body">{previewPrompt}</p>
         </div>
-      </fieldset>
+      ) : null}
 
       {error ? <p className="error-text reg-prompt-error">{error}</p> : null}
 
@@ -121,7 +127,7 @@ export function RegistrationPromptStep({
         <button
           type="button"
           className="btn-primary"
-          disabled={saving || disabled || selectedIndex === null || prompts.length === 0}
+          disabled={saving || disabled || permutationIndex === null || noRowsLeft}
           onClick={() => void handleFinalize()}
         >
           {saving ? "Saving…" : "Finish registration"}

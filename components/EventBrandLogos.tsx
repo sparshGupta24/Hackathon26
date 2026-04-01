@@ -6,7 +6,8 @@ export type EventBrandLogosVariant =
   | "formation"
   | "home"
   | "reg"
-  | "sessionSlide";
+  | "sessionSlide"
+  | "waiting";
 
 const VARIANT_MODIFIER: Record<EventBrandLogosVariant, string> = {
   arena: "event-brand-pair--arena",
@@ -14,7 +15,8 @@ const VARIANT_MODIFIER: Record<EventBrandLogosVariant, string> = {
   formation: "event-brand-pair--formation",
   home: "event-brand-pair--home",
   reg: "event-brand-pair--reg",
-  sessionSlide: "event-brand-pair--session-slide"
+  sessionSlide: "event-brand-pair--session-slide",
+  waiting: "event-brand-pair--waiting"
 };
 
 /** Event + GP logos, equal height (set per variant in CSS). */

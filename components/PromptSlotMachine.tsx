@@ -38,24 +38,50 @@ function syncReelWindowTier(windowEl: HTMLDivElement) {
   });
 }
 
-export interface PromptSlotMachineProps {
-  /** When true, lever is disabled (e.g. max spins reached). */
-  leverDisabled?: boolean;
-  /** Called once when a spin animation fully finishes with the composed prompt. */
-  onSpinComplete?: (prompt: string) => void;
-  className?: string;
-}
+export type PromptSlotSpinResult = {
+  prompt: string;
+  /** Set when reels use the same row index (registration permutations). */
+  permutationIndex?: number;
+};
 
-export function PromptSlotMachine({ leverDisabled, onSpinComplete, className }: PromptSlotMachineProps) {
-  const [slotOne, setSlotOne] = useState<string>(SLOT_ONE[0]);
-  const [slotTwo, setSlotTwo] = useState<string>(SLOT_TWO[0]);
-  const [slotThree, setSlotThree] = useState<string>(SLOT_THREE[0]);
+export type PromptSlotMachineProps = {
+  leverDisabled?: boolean;
+  onSpinComplete?: (result: PromptSlotSpinResult) => void;
+  className?: string;
+  slotOne?: readonly string[];
+  slotTwo?: readonly string[];
+  slotThree?: readonly string[];
+  /** All three reels land on the same list index. */
+  synchronized?: boolean;
+  /** When synchronized, only these indices may win (e.g. rows not yet taken by another team). */
+  allowedIndices?: number[];
+  /** Optional headings above reels (e.g. Your users — Your context — Your direction). */
+  columnLabels?: readonly [string, string, string];
+  /** Registration uses em-dash separators; generator uses phrase glue. */
+  connectorStyle?: "phrase" | "dash";
+};
+
+export function PromptSlotMachine({
+  leverDisabled,
+  onSpinComplete,
+  className,
+  slotOne = SLOT_ONE,
+  slotTwo = SLOT_TWO,
+  slotThree = SLOT_THREE,
+  synchronized = false,
+  allowedIndices,
+  columnLabels,
+  connectorStyle = "phrase"
+}: PromptSlotMachineProps) {
+  const [rowOne, setRowOne] = useState<string>(slotOne[0] ?? "");
+  const [rowTwo, setRowTwo] = useState<string>(slotTwo[0] ?? "");
+  const [rowThree, setRowThree] = useState<string>(slotThree[0] ?? "");
   const [spinning, setSpinning] = useState(false);
   const [doorsOpen, setDoorsOpen] = useState(false);
 
-  const strip1 = useMemo(() => buildStrip(SLOT_ONE), []);
-  const strip2 = useMemo(() => buildStrip(SLOT_TWO), []);
-  const strip3 = useMemo(() => buildStrip(SLOT_THREE), []);
+  const strip1 = useMemo(() => buildStrip(slotOne), [slotOne]);
+  const strip2 = useMemo(() => buildStrip(slotTwo), [slotTwo]);
+  const strip3 = useMemo(() => buildStrip(slotThree), [slotThree]);
 
   const reel0 = useRef<HTMLDivElement>(null);
   const reel1 = useRef<HTMLDivElement>(null);
@@ -93,11 +119,11 @@ export function PromptSlotMachine({ leverDisabled, onSpinComplete, className }: 
       cancelAnimationFrame(id);
       cleanups.forEach((fn) => fn());
     };
-  }, [strip1.length, syncAllReelTiers]);
+  }, [strip1.length, strip2.length, strip3.length, syncAllReelTiers]);
 
   useLayoutEffect(() => {
     syncAllReelTiers();
-  }, [slotOne, slotTwo, slotThree, spinning, syncAllReelTiers]);
+  }, [rowOne, rowTwo, rowThree, spinning, syncAllReelTiers]);
 
   const stopSpin = useCallback(() => {
     if (rafRef.current !== null) {
@@ -109,19 +135,39 @@ export function PromptSlotMachine({ leverDisabled, onSpinComplete, className }: 
 
   useEffect(() => () => stopSpin(), [stopSpin]);
 
+  const len1 = slotOne.length;
+  const len2 = slotTwo.length;
+  const len3 = slotThree.length;
+
   function pullLever() {
     if (spinning || leverDisabled) {
       return;
     }
 
-    const w0 = pickRandomIndex(SLOT_ONE.length);
-    const w1 = pickRandomIndex(SLOT_TWO.length);
-    const w2 = pickRandomIndex(SLOT_THREE.length);
+    let w0: number;
+    let w1: number;
+    let w2: number;
+
+    if (synchronized) {
+      const pool =
+        allowedIndices !== undefined && allowedIndices.length > 0
+          ? allowedIndices
+          : Array.from({ length: len1 }, (_, i) => i);
+      if (pool.length === 0 || len1 !== len2 || len2 !== len3) {
+        return;
+      }
+      const w = pool[Math.floor(Math.random() * pool.length)]!;
+      w0 = w1 = w2 = w;
+    } else {
+      w0 = pickRandomIndex(len1);
+      w1 = pickRandomIndex(len2);
+      w2 = pickRandomIndex(len3);
+    }
 
     const numberOutput = [
-      finalScrollForWinner(w0, SLOT_ONE.length),
-      finalScrollForWinner(w1, SLOT_TWO.length),
-      finalScrollForWinner(w2, SLOT_THREE.length)
+      finalScrollForWinner(w0, len1),
+      finalScrollForWinner(w1, len2),
+      finalScrollForWinner(w2, len3)
     ];
     const speeds = [Math.random() + 0.7, Math.random() + 0.7, Math.random() + 0.7];
 
@@ -153,11 +199,11 @@ export function PromptSlotMachine({ leverDisabled, onSpinComplete, className }: 
           if (!settledRef.current[i]) {
             settledRef.current[i] = true;
             if (i === 0) {
-              setSlotOne(SLOT_ONE[w0]!);
+              setRowOne(slotOne[w0]!);
             } else if (i === 1) {
-              setSlotTwo(SLOT_TWO[w1]!);
+              setRowTwo(slotTwo[w1]!);
             } else {
-              setSlotThree(SLOT_THREE[w2]!);
+              setRowThree(slotThree[w2]!);
             }
           }
         } else {
@@ -183,25 +229,41 @@ export function PromptSlotMachine({ leverDisabled, onSpinComplete, className }: 
           const maxScroll = Math.max(0, el.scrollHeight - el.clientHeight);
           el.scrollTop = Math.min(Math.max(0, numberOutput[i]!), maxScroll);
         }
-        const a = SLOT_ONE[w0]!;
-        const b = SLOT_TWO[w1]!;
-        const c = SLOT_THREE[w2]!;
-        setSlotOne(a);
-        setSlotTwo(b);
-        setSlotThree(c);
+        const a = slotOne[w0]!;
+        const b = slotTwo[w1]!;
+        const c = slotThree[w2]!;
+        setRowOne(a);
+        setRowTwo(b);
+        setRowThree(c);
         setSpinning(false);
         syncAllReelTiers();
-        onSpinCompleteRef.current?.(composePrompt(a, b, c));
+        const prompt = synchronized ? `${a} — ${b} — ${c}` : composePrompt(a, b, c);
+        onSpinCompleteRef.current?.({
+          prompt,
+          ...(synchronized ? { permutationIndex: w0 } : {})
+        });
       }
     }
 
     rafRef.current = requestAnimationFrame(animate);
   }
 
+  const registrationClass = columnLabels ? " pg-slot-machine--registration" : "";
+
   return (
-    <section className={["panel pg-slot-machine", className].filter(Boolean).join(" ")}>
+    <section className={["panel pg-slot-machine", registrationClass, className].filter(Boolean).join(" ")}>
       <div className="pg-slot-chrome">
         <div className="pg-slot-lamps" aria-hidden />
+        {columnLabels ? (
+          <div className="pg-slot-labels-row" aria-hidden>
+            <span className="pg-slot-col-label">{columnLabels[0]}</span>
+            <span className="pg-slot-label-sep">--</span>
+            <span className="pg-slot-col-label">{columnLabels[1]}</span>
+            <span className="pg-slot-label-sep">--</span>
+            <span className="pg-slot-col-label">{columnLabels[2]}</span>
+            <div className="pg-slot-labels-lever-gap" />
+          </div>
+        ) : null}
         <div className="pg-slot-machine-row">
           <div className={`pg-reel ${spinning ? "pg-reel--spinning" : ""} ${doorsOpen ? "pg-reel--doors-open" : ""}`}>
             <div className="pg-reel-door" aria-hidden />
@@ -215,10 +277,16 @@ export function PromptSlotMachine({ leverDisabled, onSpinComplete, className }: 
               </div>
             </div>
           </div>
-          <div className="pg-slot-connector pg-slot-connector--stack">
-            <span className="pg-slot-connector-line">needs</span>
-            <span className="pg-slot-connector-line">to</span>
-          </div>
+          {connectorStyle === "dash" ? (
+            <div className="pg-slot-connector pg-slot-connector--dash" aria-hidden>
+              --
+            </div>
+          ) : (
+            <div className="pg-slot-connector pg-slot-connector--stack">
+              <span className="pg-slot-connector-line">needs</span>
+              <span className="pg-slot-connector-line">to</span>
+            </div>
+          )}
           <div className={`pg-reel ${spinning ? "pg-reel--spinning" : ""} ${doorsOpen ? "pg-reel--doors-open" : ""}`}>
             <div className="pg-reel-door" aria-hidden />
             <div ref={reelRefs[1]} className="pg-reel-window">
@@ -231,9 +299,15 @@ export function PromptSlotMachine({ leverDisabled, onSpinComplete, className }: 
               </div>
             </div>
           </div>
-          <div className="pg-slot-connector pg-slot-connector--stack">
-            <span className="pg-slot-connector-line">for</span>
-          </div>
+          {connectorStyle === "dash" ? (
+            <div className="pg-slot-connector pg-slot-connector--dash" aria-hidden>
+              --
+            </div>
+          ) : (
+            <div className="pg-slot-connector pg-slot-connector--stack">
+              <span className="pg-slot-connector-line">for</span>
+            </div>
+          )}
           <div className={`pg-reel ${spinning ? "pg-reel--spinning" : ""} ${doorsOpen ? "pg-reel--doors-open" : ""}`}>
             <div className="pg-reel-door" aria-hidden />
             <div ref={reelRefs[2]} className="pg-reel-window">
@@ -253,7 +327,15 @@ export function PromptSlotMachine({ leverDisabled, onSpinComplete, className }: 
                 className={`am-lever ${spinning ? "am-lever--pulled" : ""}`}
                 onClick={pullLever}
                 disabled={spinning || leverDisabled}
-                aria-label={spinning ? "Spinning reels" : leverDisabled ? "No spins remaining" : "Pull lever to spin reels"}
+                aria-label={
+                  spinning
+                    ? "Spinning reels"
+                    : leverDisabled
+                      ? "Lever locked"
+                      : synchronized
+                        ? "Pull lever once for your prompt row"
+                        : "Pull lever to spin reels"
+                }
                 aria-busy={spinning}
               />
             </div>
@@ -261,13 +343,23 @@ export function PromptSlotMachine({ leverDisabled, onSpinComplete, className }: 
         </div>
       </div>
 
-      <p className="pg-slot-readout">
-        <strong className="pg-slot-readout-slot">{leadLower(slotOne)}</strong>{" "}
-        <span className="pg-slot-readout-glue">needs to</span>{" "}
-        <strong className="pg-slot-readout-slot">{leadLower(slotTwo)}</strong>{" "}
-        <span className="pg-slot-readout-glue">for</span>{" "}
-        <strong className="pg-slot-readout-slot">{leadLower(slotThree)}</strong>
-      </p>
+      {connectorStyle === "dash" ? (
+        <p className="pg-slot-readout pg-slot-readout--triple">
+          <strong className="pg-slot-readout-slot">{rowOne}</strong>
+          <span className="pg-slot-readout-glue"> — </span>
+          <strong className="pg-slot-readout-slot">{rowTwo}</strong>
+          <span className="pg-slot-readout-glue"> — </span>
+          <strong className="pg-slot-readout-slot">{rowThree}</strong>
+        </p>
+      ) : (
+        <p className="pg-slot-readout">
+          <strong className="pg-slot-readout-slot">{leadLower(rowOne)}</strong>{" "}
+          <span className="pg-slot-readout-glue">needs to</span>{" "}
+          <strong className="pg-slot-readout-slot">{leadLower(rowTwo)}</strong>{" "}
+          <span className="pg-slot-readout-glue">for</span>{" "}
+          <strong className="pg-slot-readout-slot">{leadLower(rowThree)}</strong>
+        </p>
+      )}
     </section>
   );
 }

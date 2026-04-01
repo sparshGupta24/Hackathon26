@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { PersonAwardCeremonyCard } from "@/components/PersonAwardCeremonyCard";
+import { fireAwardConfetti } from "@/lib/awardConfetti";
 import type { PeopleAwardPresentationItem } from "@/lib/types";
 
 export default function PeopleAwardsPage() {
@@ -126,9 +127,13 @@ export default function PeopleAwardsPage() {
                 description={item.description}
                 winner={item.winner}
                 team={item.team}
+                awardPendingTieBreak={item.awardPendingTieBreak === true}
                 showBack={showBack}
                 isInteractiveFront={isActive && !revealed}
-                onRevealClick={() => setRevealed(true)}
+                onRevealClick={() => {
+                  fireAwardConfetti();
+                  setRevealed(true);
+                }}
                 showNextCta={isActive && revealed}
                 onNext={goNext}
                 isLastAward={activeIndex === lastIndex}

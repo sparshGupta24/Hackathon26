@@ -15,8 +15,7 @@ export async function POST(request: Request) {
 
     await setTeamChallengePrompt({
       teamId: parsed.data.teamId,
-      prompt: parsed.data.prompt,
-      spinsUsed: parsed.data.spinsUsed
+      permutationIndex: parsed.data.permutationIndex
     });
 
     const state = await getEventState();
@@ -27,6 +26,12 @@ export async function POST(request: Request) {
     }
     if (error instanceof Error && error.message === "CHALLENGE_PROMPT_ALREADY_SET") {
       return badRequest("This team already has a challenge prompt.");
+    }
+    if (error instanceof Error && error.message === "PERMUTATION_TAKEN") {
+      return badRequest("That prompt row was just claimed by another team. Pull the lever again.");
+    }
+    if (error instanceof Error && error.message === "INVALID_PERMUTATION_INDEX") {
+      return badRequest("Invalid prompt row.");
     }
 
     console.error("Failed to set challenge prompt", error);

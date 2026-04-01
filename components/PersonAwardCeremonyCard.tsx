@@ -37,13 +37,16 @@ export function PersonAwardCeremonyCard({
   showNextCta,
   onNext,
   isLastAward,
-  isFuture
+  isFuture,
+  awardPendingTieBreak
 }: {
   slotId: string;
   title: string;
   description: string;
   winner: PeopleAwardWinnerPresentation | null;
   team: TeamState | null;
+  /** Audience vote is tied; organizers confirm winner on /voteadmin. */
+  awardPendingTieBreak?: boolean;
   showBack: boolean;
   isInteractiveFront: boolean;
   onRevealClick: () => void;
@@ -124,6 +127,13 @@ export function PersonAwardCeremonyCard({
                       })()}
                     </div>
                   ) : null}
+                </>
+              ) : awardPendingTieBreak ? (
+                <>
+                  <p className="team-award-winner-ribbon">Winner</p>
+                  <p className="team-award-no-winner muted">
+                    This category has a tie for the most votes. Organizers will confirm the winner before it appears here.
+                  </p>
                 </>
               ) : (
                 <>

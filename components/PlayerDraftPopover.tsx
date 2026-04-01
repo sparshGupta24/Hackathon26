@@ -16,6 +16,8 @@ export interface PlayerDraftPopoverProps {
   onClose: () => void;
   onSelect: (personId: string) => void;
   triggerDisabled?: boolean;
+  /** Show control to clear selection (optional roles only). */
+  allowClear?: boolean;
 }
 
 export function PlayerDraftPopover({
@@ -28,7 +30,8 @@ export function PlayerDraftPopover({
   currentSelectionId,
   onClose,
   onSelect,
-  triggerDisabled
+  triggerDisabled,
+  allowClear
 }: PlayerDraftPopoverProps) {
   const [query, setQuery] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
@@ -102,6 +105,21 @@ export function PlayerDraftPopover({
             disabled={triggerDisabled}
           />
         </label>
+
+        {allowClear && currentSelectionId.trim() ? (
+          <div className="player-draft-clear-wrap">
+            <button
+              type="button"
+              className="btn-secondary player-draft-clear"
+              onClick={() => {
+                onSelect("");
+                onClose();
+              }}
+            >
+              Leave role unassigned
+            </button>
+          </div>
+        ) : null}
 
         {filtered.length === 0 ? (
           <p className="muted small">No players match your search.</p>

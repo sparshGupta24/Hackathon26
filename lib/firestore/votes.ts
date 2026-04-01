@@ -76,6 +76,28 @@ export async function submitVoteBallot(input: {
   await batch.commit();
 }
 
+/** Remove every document in the audience vote collection (full tally reset). Returns how many docs were deleted. */
+export async function clearAllAudienceVotes(): Promise<number> {
+  const db = getDb();
+  const snap = await db.collection(COL_VOTES).get();
+  if (snap.empty) {
+    return 0;
+  }
+  const BATCH_MAX = 450;
+  let deleted = 0;
+  const docs = snap.docs;
+  for (let i = 0; i < docs.length; i += BATCH_MAX) {
+    const batch = db.batch();
+    const chunk = docs.slice(i, i + BATCH_MAX);
+    for (const d of chunk) {
+      batch.delete(d.ref);
+    }
+    await batch.commit();
+    deleted += chunk.length;
+  }
+  return deleted;
+}
+
 export async function getVoteTallies(): Promise<VoteTallies> {
   const db = getDb();
   const snap = await db.collection(COL_VOTES).get();

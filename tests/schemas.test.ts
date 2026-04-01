@@ -33,10 +33,25 @@ describe("registration schema", () => {
     expect(result.success).toBe(false);
   });
 
-  it("rejects more than 5 players", () => {
+  it("accepts 6 distinct players", () => {
+    const result = registrationSchema.safeParse({
+      teamName: "Full Bench",
+      playerIds: ["a", "b", "c", "d", "e", "f"],
+      livery: {
+        carTemplate: "03",
+        primaryColor: "#00AA00",
+        secondaryColor: "#001122",
+        tertiaryColor: "#112233",
+        carNumber: 11
+      }
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects more than 6 players", () => {
     const result = registrationSchema.safeParse({
       teamName: "Team Overflow",
-      playerIds: ["a", "b", "c", "d", "e", "f"],
+      playerIds: ["a", "b", "c", "d", "e", "f", "g"],
       livery: {
         carTemplate: "03",
         primaryColor: "#00AA00",
@@ -64,6 +79,21 @@ describe("registration schema", () => {
     expect(result.success).toBe(false);
   });
 
+  it("rejects duplicate when sixth id repeats a required slot", () => {
+    const result = registrationSchema.safeParse({
+      teamName: "Dupes Six",
+      playerIds: ["a", "b", "c", "d", "e", "a"],
+      livery: {
+        carTemplate: "07",
+        primaryColor: "#FF0000",
+        secondaryColor: "#001122",
+        tertiaryColor: "#8D99AE",
+        carNumber: 1
+      }
+    });
+    expect(result.success).toBe(false);
+  });
+
   it("only allows 5 or 10 minute extensions", () => {
     expect(timerExtendSchema.safeParse({ minutes: 5 }).success).toBe(true);
     expect(timerExtendSchema.safeParse({ minutes: 10 }).success).toBe(true);
@@ -72,28 +102,25 @@ describe("registration schema", () => {
 });
 
 describe("challenge prompt schema", () => {
-  it("accepts a valid payload", () => {
+  it("accepts a valid permutation index", () => {
     const result = challengePromptSchema.safeParse({
       teamId: "abc123",
-      prompt: "A rubber duck needs to Run a live auction for A crew of elite Navy SEALs",
-      spinsUsed: 2
+      permutationIndex: 4
     });
     expect(result.success).toBe(true);
   });
 
-  it("rejects spinsUsed out of range", () => {
+  it("rejects permutationIndex out of range", () => {
     expect(
       challengePromptSchema.safeParse({
         teamId: "x",
-        prompt: "A golden retriever needs to Assign and track tasks for A panel of Fortune 500 CEOs",
-        spinsUsed: 0
+        permutationIndex: -1
       }).success
     ).toBe(false);
     expect(
       challengePromptSchema.safeParse({
         teamId: "x",
-        prompt: "A golden retriever needs to Assign and track tasks for A panel of Fortune 500 CEOs",
-        spinsUsed: 4
+        permutationIndex: 9
       }).success
     ).toBe(false);
   });

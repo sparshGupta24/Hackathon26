@@ -16,7 +16,7 @@ export interface PlayerState {
   slot: number;
   /** Copied from the people corpus at registration time for display. */
   photoUrl?: string;
-  /** Fixed role title when registered with the five-role form (e.g. Gunners). */
+  /** Fixed role title from registration (e.g. Gunners, Stabiliser #1). */
   roleTitle?: string;
 }
 
@@ -38,7 +38,9 @@ export interface TeamState {
   livery: LiveryState | null;
   /** Challenge prompt from registration step 2 (slot machine), once finalized. */
   challengePrompt?: string;
-  /** How many lever pulls were used before choosing (1–3). */
+  /** Locked row index for registration permutations (0–8); unset for legacy teams. */
+  promptPermutationIndex?: number;
+  /** Always 1 for new registrations (single spin). */
   promptSpinsUsed?: number;
   /** Volunteer-entered mission statement text. */
   missionStatement?: string;
@@ -105,6 +107,8 @@ export type PeopleAwardPresentationItem = {
   winner: PeopleAwardWinnerPresentation | null;
   /** Team entity for livery preview when known. */
   team: TeamState | null;
+  /** Votes exist but multiple people are tied for first; set winner on /voteadmin. */
+  awardPendingTieBreak?: boolean;
 };
 
 export type { VolunteerAwardKey } from "./volunteerRewards";

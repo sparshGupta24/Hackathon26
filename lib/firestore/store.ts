@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { FieldValue, Timestamp, type QueryDocumentSnapshot } from "firebase-admin/firestore";
 import { parseCarTemplateId } from "@/lib/carSvgs";
 import { DEFAULT_BASE_DURATION_SEC, TEAM_LIMIT, TEAM_ROLES } from "@/lib/constants";
+import { composeRegistrationPrompt, isValidPermutationIndex } from "@/lib/promptPermutations";
 import { getDb } from "@/lib/firebaseAdmin";
 import { COL_PEOPLE, resolvePeopleByIds } from "@/lib/firestore/people";
 import { getRemainingSeconds, shouldAutoEnd, totalDurationSec } from "@/lib/timer";
@@ -130,6 +131,9 @@ function docToTeamState(doc: QueryDocumentSnapshot): TeamState {
     typeof d.challengePrompt === "string" && d.challengePrompt.trim() ? String(d.challengePrompt) : undefined;
   const promptSpinsUsed =
     typeof d.promptSpinsUsed === "number" && Number.isFinite(d.promptSpinsUsed) ? d.promptSpinsUsed : undefined;
+  const rawPermIdx = d.promptPermutationIndex;
+  const promptPermutationIndex =
+    typeof rawPermIdx === "number" && isValidPermutationIndex(rawPermIdx) ? rawPermIdx : undefined;
   const missionStatement =
     typeof d.missionStatement === "string" ? String(d.missionStatement) : undefined;
   return {
@@ -149,6 +153,7 @@ function docToTeamState(doc: QueryDocumentSnapshot): TeamState {
           }
         : null,
     ...(challengePrompt ? { challengePrompt } : {}),
+    ...(promptPermutationIndex !== undefined ? { promptPermutationIndex } : {}),
     ...(promptSpinsUsed !== undefined ? { promptSpinsUsed } : {}),
     ...(missionStatement !== undefined ? { missionStatement } : {})
   };
@@ -311,15 +316,12 @@ export async function registerTeam(input: {
   });
 }
 
-export async function setTeamChallengePrompt(input: {
-  teamId: string;
-  prompt: string;
-  spinsUsed: number;
-}): Promise<void> {
+export async function setTeamChallengePrompt(input: { teamId: string; permutationIndex: number }): Promise<void> {
   const db = getDb();
   await db.runTransaction(async (transaction) => {
     const teamRef = db.collection(COL_TEAMS).doc(input.teamId);
-    const teamSnap = await transaction.get(teamRef);
+    const teamsQuery = db.collection(COL_TEAMS).orderBy("createdAt", "asc");
+    const [teamSnap, teamsSnap] = await Promise.all([transaction.get(teamRef), transaction.get(teamsQuery)]);
     if (!teamSnap.exists) {
       throw new Error("TEAM_NOT_FOUND");
     }
@@ -328,9 +330,23 @@ export async function setTeamChallengePrompt(input: {
     if (typeof existing === "string" && existing.trim().length > 0) {
       throw new Error("CHALLENGE_PROMPT_ALREADY_SET");
     }
+    if (!isValidPermutationIndex(input.permutationIndex)) {
+      throw new Error("INVALID_PERMUTATION_INDEX");
+    }
+    for (const doc of teamsSnap.docs) {
+      if (doc.id === input.teamId) {
+        continue;
+      }
+      const taken = doc.data()?.promptPermutationIndex;
+      if (typeof taken === "number" && taken === input.permutationIndex) {
+        throw new Error("PERMUTATION_TAKEN");
+      }
+    }
+    const prompt = composeRegistrationPrompt(input.permutationIndex);
     transaction.update(teamRef, {
-      challengePrompt: input.prompt.trim(),
-      promptSpinsUsed: input.spinsUsed,
+      challengePrompt: prompt,
+      promptPermutationIndex: input.permutationIndex,
+      promptSpinsUsed: 1,
       challengePromptAt: FieldValue.serverTimestamp()
     });
   });

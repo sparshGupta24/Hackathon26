@@ -21,6 +21,9 @@ export default function EventHomePage() {
           <Link href="/vote" className="btn-secondary event-home-cta">
             Voting Portal
           </Link>
+          <Link href="/voteadmin" className="btn-secondary event-home-cta">
+            Vote admin
+          </Link>
           <Link href="/registrations" className="btn-secondary event-home-cta">
             Registration
           </Link>

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { TeamAwardCeremonyCard } from "@/components/TeamAwardCeremonyCard";
+import { fireAwardConfetti } from "@/lib/awardConfetti";
 import type { TeamAwardPresentationItem } from "@/lib/types";
 
 export default function TeamAwardsPage() {
@@ -127,7 +128,10 @@ export default function TeamAwardsPage() {
                 team={item.team}
                 showBack={showBack}
                 isInteractiveFront={isActive && !revealed}
-                onRevealClick={() => setRevealed(true)}
+                onRevealClick={() => {
+                  fireAwardConfetti();
+                  setRevealed(true);
+                }}
                 showNextCta={isActive && revealed}
                 onNext={goNext}
                 isLastAward={activeIndex === lastIndex}

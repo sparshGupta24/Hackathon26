@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { CAR_TEMPLATE_IDS } from "@/lib/carSvgs";
 import { MAX_PLAYERS, MIN_PLAYERS } from "@/lib/constants";
+import { PROMPT_PERMUTATION_COUNT } from "@/lib/promptPermutations";
+import { VOTE_CATEGORIES } from "@/lib/voteCategories";
 
 const hexColorRegex = /^#[0-9A-Fa-f]{6}$/;
 
@@ -44,10 +46,24 @@ export const deleteTeamSchema = z.object({
   teamId: z.string().trim().min(1, "teamId is required")
 });
 
+const voteCategoryIdEnum = z.enum(
+  VOTE_CATEGORIES.map((c) => c.id) as [typeof VOTE_CATEGORIES[number]["id"], ...typeof VOTE_CATEGORIES[number]["id"][]]
+);
+
+export const confirmPeopleAwardSchema = z.object({
+  categoryId: voteCategoryIdEnum,
+  playerId: z.string().trim().min(1, "playerId is required"),
+  teamId: z.string().trim().min(1, "teamId is required")
+});
+
 export const challengePromptSchema = z.object({
   teamId: z.string().trim().min(1, "teamId is required"),
-  prompt: z.string().trim().min(12, "Prompt is too short").max(500, "Prompt is too long"),
-  spinsUsed: z.number().int().min(1, "Spin at least once").max(3, "At most three spins are allowed")
+  /** Locked row index 0..PROMPT_PERMUTATION_COUNT-1; server composes the stored prompt text. */
+  permutationIndex: z
+    .number()
+    .int()
+    .min(0, "Invalid prompt row")
+    .max(PROMPT_PERMUTATION_COUNT - 1, "Invalid prompt row")
 });
 
 export const missionStatementTextMax = 2000;

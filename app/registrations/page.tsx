@@ -11,14 +11,21 @@ import {
   carSvgPathForTemplateId,
   liveryHexBucketsForTemplate
 } from "@/lib/carSvgs";
-import { MAX_PLAYERS, MIN_PLAYERS, TEAM_LIMIT, TEAM_ROLES } from "@/lib/constants";
+import {
+  MAX_PLAYERS,
+  MIN_PLAYERS,
+  REQUIRED_TEAM_ROLE_COUNT,
+  TEAM_LIMIT,
+  TEAM_ROLES
+} from "@/lib/constants";
 import { EventBrandLogos } from "@/components/EventBrandLogos";
+import { PROMPT_PERMUTATION_COUNT } from "@/lib/promptPermutations";
 import type { PersonPublic } from "@/lib/types";
 import { useEventState } from "@/lib/useEventState";
 
 interface RegistrationFormState {
   teamName: string;
-  /** One roster id per fixed role slot (Gunners → Lollipop Man), same order as TEAM_ROLES */
+  /** One roster id per fixed role slot (same order as TEAM_ROLES; optional slot may be ""). */
   rolePlayerIds: string[];
   livery: {
     carTemplate: CarTemplateId;
@@ -31,7 +38,7 @@ interface RegistrationFormState {
 
 const initialForm: RegistrationFormState = {
   teamName: "",
-  rolePlayerIds: ["", "", "", "", ""],
+  rolePlayerIds: ["", "", "", "", "", ""],
   livery: {
     carTemplate: "01",
     primaryColor: "#D62828",
@@ -54,6 +61,12 @@ export default function RegistrationsPage() {
   const [step, setStep] = useState<1 | 2>(1);
   const [pendingTeamId, setPendingTeamId] = useState<string | null>(null);
   const [pendingTeamName, setPendingTeamName] = useState("");
+  /** Roster for the team that just registered (for thank-you after prompt step). */
+  const [promptStepCrew, setPromptStepCrew] = useState<PersonPublic[]>([]);
+  const [postCompleteThanks, setPostCompleteThanks] = useState<{
+    teamName: string;
+    members: PersonPublic[];
+  } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -86,9 +99,25 @@ export default function RegistrationsPage() {
   const spotsLeft = Math.max(0, TEAM_LIMIT - registeredTeams);
   const registrationClosed = spotsLeft === 0;
 
+  const availablePromptPermutationIndices = useMemo(() => {
+    const taken = new Set<number>();
+    for (const t of data?.teams ?? []) {
+      const idx = t.promptPermutationIndex;
+      if (typeof idx === "number" && idx >= 0 && idx < PROMPT_PERMUTATION_COUNT) {
+        taken.add(idx);
+      }
+    }
+    return Array.from({ length: PROMPT_PERMUTATION_COUNT }, (_, i) => i).filter((i) => !taken.has(i));
+  }, [data?.teams]);
+
   const roleIdsTrimmed = useMemo(
     () => formState.rolePlayerIds.map((id) => id.trim()),
     [formState.rolePlayerIds]
+  );
+
+  const playerIdsForApi = useMemo(
+    () => roleIdsTrimmed.filter((id) => id.length > 0),
+    [roleIdsTrimmed]
   );
 
   /** People already assigned to any registered team cannot be picked again. */
@@ -122,17 +151,23 @@ export default function RegistrationsPage() {
     if (!formState.teamName.trim()) {
       return "Enter a team name.";
     }
-    if (roleIdsTrimmed.some((id) => !id)) {
-      return "Select one roster player for each of the five roles.";
+    const missingRequired = TEAM_ROLES.filter((role, i) => !role.optional && !roleIdsTrimmed[i]).map(
+      (r) => r.title
+    );
+    if (missingRequired.length > 0) {
+      if (missingRequired.length === 1) {
+        return `Assign a recruit to the ${missingRequired[0]} role (required).`;
+      }
+      return `These roles still need a recruit: ${missingRequired.join(", ")}.`;
     }
-    if (roleIdsTrimmed.length !== MAX_PLAYERS) {
-      return "All five roles must be assigned.";
+    if (playerIdsForApi.length < MIN_PLAYERS || playerIdsForApi.length > MAX_PLAYERS) {
+      return `Your team must have between ${MIN_PLAYERS} and ${MAX_PLAYERS} members (required roles plus optional Stabiliser #2).`;
     }
-    if (new Set(roleIdsTrimmed).size !== roleIdsTrimmed.length) {
+    if (new Set(playerIdsForApi).size !== playerIdsForApi.length) {
       return "Each role must be a different person.";
     }
     return null;
-  }, [people.length, formState.teamName, roleIdsTrimmed]);
+  }, [people.length, formState.teamName, roleIdsTrimmed, playerIdsForApi]);
 
   const submitTeamRegistration = useCallback(async (): Promise<{ ok: true; teamId: string } | { ok: false }> => {
     setFeedback(null);
@@ -149,7 +184,7 @@ export default function RegistrationsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           teamName: formState.teamName.trim(),
-          playerIds: roleIdsTrimmed,
+          playerIds: playerIdsForApi,
           livery: formState.livery
         })
       });
@@ -170,7 +205,7 @@ export default function RegistrationsPage() {
     } finally {
       setSubmitting(false);
     }
-  }, [formState.teamName, formState.livery, refresh, roleIdsTrimmed, validationMessage]);
+  }, [formState.teamName, formState.livery, playerIdsForApi, refresh, validationMessage]);
 
   function openConfirmModal() {
     setFeedback(null);
@@ -183,8 +218,13 @@ export default function RegistrationsPage() {
 
   async function handleConfirmSubmit() {
     const name = formState.teamName.trim();
+    const crewIdsSnapshot = [...playerIdsForApi];
     const result = await submitTeamRegistration();
     if (result.ok) {
+      const crew = crewIdsSnapshot
+        .map((id) => people.find((p) => p.id === id))
+        .filter((p): p is PersonPublic => Boolean(p));
+      setPromptStepCrew(crew);
       setConfirmOpen(false);
       setFormState(initialForm);
       setShowNiceNameChip(false);
@@ -196,11 +236,24 @@ export default function RegistrationsPage() {
   }
 
   function handlePromptStepDone() {
+    setConfirmOpen(false);
+    setDraftOpenSlot(null);
+    setPostCompleteThanks({ teamName: pendingTeamName, members: [...promptStepCrew] });
     setStep(1);
     setPendingTeamId(null);
     setPendingTeamName("");
+    setPromptStepCrew([]);
     void refresh();
-    setFeedback("Registration complete — team and challenge prompt saved.");
+    setFeedback(null);
+  }
+
+  function dismissThanks() {
+    setConfirmOpen(false);
+    setDraftOpenSlot(null);
+    setPostCompleteThanks(null);
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, left: 0, behavior: "smooth" });
+    }
   }
 
   function handleTeamNameBlur(event: FocusEvent<HTMLInputElement>) {
@@ -232,32 +285,98 @@ export default function RegistrationsPage() {
         <>
           <section className="panel">
             <header className="reg-page-header">
-              <div className="reg-header-logos">
-                <EventBrandLogos variant="reg" />
-              </div>
+              {!postCompleteThanks ? (
+                <div className="reg-header-logos">
+                  <EventBrandLogos variant="reg" />
+                </div>
+              ) : null}
               <h1 className="reg-page-title">Team Registration</h1>
               <div className="reg-header-meta">
                 <span className={`pill ${registrationClosed ? "ended" : "idle"}`}>Slots left: {spotsLeft}</span>
               </div>
               <div className="reg-stepper" aria-label="Registration progress">
-                <span className={`reg-step${step === 1 ? " reg-step--active" : " reg-step--done"}`}>1 · Team</span>
+                <span
+                  className={`reg-step${postCompleteThanks || step === 2 ? " reg-step--done" : ""}${
+                    step === 1 && !postCompleteThanks ? " reg-step--active" : ""
+                  }`}
+                >
+                  1 · Team
+                </span>
                 <span className="reg-step-sep" aria-hidden>
                   →
                 </span>
-                <span className={`reg-step${step === 2 ? " reg-step--active" : ""}`}>2 · Prompt</span>
+                <span
+                  className={`reg-step${postCompleteThanks ? " reg-step--done" : ""}${
+                    step === 2 ? " reg-step--active" : ""
+                  }`}
+                >
+                  2 · Prompt
+                </span>
               </div>
             </header>
+
+            {postCompleteThanks ? (
+              <div
+                className="reg-thanks"
+                role="status"
+                aria-live="polite"
+                aria-label="Registration successful"
+              >
+                <div className="reg-thanks-logos">
+                  <EventBrandLogos variant="reg" className="event-brand-pair--reg-thanks" />
+                </div>
+                <p className="reg-thanks-message">
+                  Thanks for registering <strong>{postCompleteThanks.teamName}</strong>
+                </p>
+                <ul className="reg-thanks-crew" aria-label="Team members">
+                  {postCompleteThanks.members.map((member) => (
+                    <li key={member.id} className="reg-thanks-crew-item" aria-label={member.name}>
+                      {member.photoUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element -- roster URLs
+                        <img
+                          src={member.photoUrl}
+                          alt=""
+                          className="reg-thanks-crew-photo"
+                          width={88}
+                          height={88}
+                        />
+                      ) : (
+                        <span className="reg-thanks-crew-fallback" aria-hidden>
+                          {member.name.slice(0, 1).toUpperCase()}
+                        </span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+                <p className="muted small reg-thanks-sub">
+                  Your team and challenge prompt are saved. Good luck in the hack.
+                </p>
+                <button
+                  type="button"
+                  className="btn-primary reg-thanks-dismiss"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    dismissThanks();
+                  }}
+                >
+                  Continue
+                </button>
+              </div>
+            ) : null}
 
             {step === 2 && pendingTeamId ? (
               <RegistrationPromptStep
                 teamId={pendingTeamId}
                 teamName={pendingTeamName}
                 disabled={registrationClosed}
+                availablePermutationIndices={availablePromptPermutationIndices}
+                onRefreshState={() => void refresh()}
                 onDone={handlePromptStepDone}
               />
             ) : null}
 
-            {step === 1 ? (
+            {step === 1 && !postCompleteThanks ? (
             <form className="form-grid reg-form" onSubmit={preventFormSubmit}>
               <div className="reg-form-pods">
                 <div className="reg-pod reg-pod--team" role="group" aria-labelledby="reg-pod-team-label">
@@ -296,7 +415,12 @@ export default function RegistrationsPage() {
 
                   <div className="reg-pod-roles-section">
                     <p className="reg-pod-sublabel muted small">
-                      {MIN_PLAYERS} roles — {peopleLoading ? "Loading roster…" : people.length === 0 ? "Add players in Volunteer Portal first." : "Tap a card to assign. Drafted players are unavailable."}
+                      {REQUIRED_TEAM_ROLE_COUNT} required roles and 1 optional (Stabiliser #2) —{" "}
+                      {peopleLoading
+                        ? "Loading roster…"
+                        : people.length === 0
+                          ? "Add players in Volunteer Portal first."
+                          : "Tap a card to assign. Drafted players are unavailable."}
                     </p>
                     {!peopleLoading && people.length === 0 ? (
                       <p className="muted small">
@@ -312,13 +436,17 @@ export default function RegistrationsPage() {
                         const pickerDisabled = registrationClosed || submitting || people.length === 0;
                         return (
                           <button
-                            key={role.title}
+                            key={`${slotIndex}-${role.title}`}
                             type="button"
-                            className="reg-role-card"
+                            className={`reg-role-card${role.optional ? " reg-role-card--optional" : ""}`}
                             disabled={pickerDisabled}
                             aria-expanded={draftOpenSlot === slotIndex}
                             aria-haspopup="dialog"
-                            aria-label={`${role.title} — select recruit`}
+                            aria-label={
+                              role.optional
+                                ? `${role.title} (optional) — select recruit or leave unassigned`
+                                : `${role.title} (required) — select recruit`
+                            }
                             onClick={() => setDraftOpenSlot(slotIndex)}
                           >
                             <div className="reg-role-card-head">
@@ -352,7 +480,9 @@ export default function RegistrationsPage() {
                               {selected ? (
                                 <span className="reg-role-card-name">{selected.name}</span>
                               ) : (
-                                <span className="reg-role-card-footer-placeholder">Select a recruit</span>
+                                <span className="reg-role-card-footer-placeholder">
+                                  {role.optional ? "Optional — tap to add" : "Select a recruit"}
+                                </span>
                               )}
                             </div>
                           </button>
@@ -506,18 +636,19 @@ export default function RegistrationsPage() {
                     });
                   }}
                   triggerDisabled={registrationClosed || submitting}
+                  allowClear={Boolean(TEAM_ROLES[draftOpenSlot]?.optional)}
                 />
               ) : null}
             </form>
             ) : null}
 
-            {feedback ? <p className="feedback">{feedback}</p> : null}
+            {feedback && !postCompleteThanks ? <p className="feedback">{feedback}</p> : null}
             {error ? <p className="error-text">{error}</p> : null}
           </section>
         </>
       )}
 
-      {!loading && data && step === 1 ? (
+      {!loading && data && step === 1 && !postCompleteThanks ? (
         <button
           type="button"
           className="reg-fab"
@@ -566,14 +697,18 @@ export default function RegistrationsPage() {
                 <div className="reg-confirm-pod reg-confirm-pod--crew">
                   <p className="reg-confirm-pod-label">Team members</p>
                   <div className="reg-confirm-crew">
-                    {confirmCrew.map(({ role, person }) => (
-                      <div key={role.title} className="reg-confirm-crew-row">
+                    {confirmCrew.map(({ role, person }, idx) => (
+                      <div key={`${idx}-${role.title}`} className="reg-confirm-crew-row">
                         {person?.photoUrl ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img src={person.photoUrl} alt="" className="reg-confirm-crew-photo" width={40} height={40} />
                         ) : person ? (
                           <span className="reg-confirm-crew-fallback" aria-hidden>
                             {person.name.slice(0, 1).toUpperCase()}
+                          </span>
+                        ) : role.optional ? (
+                          <span className="reg-confirm-crew-fallback reg-confirm-crew-fallback--muted" aria-hidden>
+                            —
                           </span>
                         ) : (
                           <span className="reg-confirm-crew-fallback" aria-hidden>
@@ -582,7 +717,9 @@ export default function RegistrationsPage() {
                         )}
                         <div className="reg-confirm-crew-meta">
                           <span className="reg-confirm-crew-role">{role.title}</span>
-                          <span className="reg-confirm-crew-name">{person?.name ?? "—"}</span>
+                          <span className="reg-confirm-crew-name">
+                            {person?.name ?? (role.optional ? "Optional — not assigned" : "—")}
+                          </span>
                         </div>
                       </div>
                     ))}
