@@ -16,7 +16,7 @@ function hasPrompt(team: TeamState) {
 }
 
 export default function FormationPage() {
-  const { data, loading, error } = useEventState(true);
+  const { data, loading, error } = useEventState(true, 10_000);
   const teams = data?.teams ?? [];
   const slots: Array<TeamState | null> = Array.from({ length: GRID_SLOTS }, (_, i) => teams[i] ?? null);
 
