@@ -82,9 +82,10 @@ export function RegulationChangeTeamCard({ team }: { team: TeamState }) {
 
           <div className="team-award-flip-face team-award-flip-back regulation-change-back">
             <div className="team-award-back-body regulation-change-back-body">
-              <h3 className="regulation-change-exclaim" aria-label="Regulation direction">
+              <h3 className="regulation-change-exclaim" aria-hidden>
                 !
               </h3>
+              <h4 className="regulation-change-back-team-name">{team.name}</h4>
               <p className="regulation-change-direction-text">
                 {directionText ? (
                   directionText

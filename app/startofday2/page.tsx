@@ -11,7 +11,7 @@ export default function StartOfDay2Page() {
       title="Welcome back to Day 2"
       visual="logo"
       visualAriaLabel="Event and Grand Prix logos"
-      nextHref="/arena3"
+      nextHref="/regulationchanges"
     />
   );
 }

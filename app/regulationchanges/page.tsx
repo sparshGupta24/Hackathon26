@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import Link from "next/link";
 import { EventBrandLogos } from "@/components/EventBrandLogos";
 import { RegulationChangeTeamCard } from "@/components/RegulationChangeTeamCard";
 import { useEventState } from "@/lib/useEventState";
@@ -42,6 +43,12 @@ export default function RegulationChangesPage() {
           ))}
         </div>
       )}
+
+      <div className="regulation-changes-footer">
+        <Link href="/arena3" className="btn-primary regulation-changes-next">
+          Next
+        </Link>
+      </div>
     </main>
   );
 }
