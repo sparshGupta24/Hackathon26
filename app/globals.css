@@ -6562,6 +6562,77 @@ span.team-award-roster-avatar.team-award-roster-fallback {
   text-align: center;
 }
 
+/* —— View awards (/view) —— */
+.view-page {
+  max-width: min(1100px, 100%);
+}
+
+.view-awards-list {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.view-awards-card {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.view-awards-title {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.view-awards-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.view-awards-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.view-awards-row-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-width: 0;
+}
+
+.view-awards-row-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.view-awards-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  padding: 0.15rem 0.4rem;
+  border-radius: 999px;
+  border: 1px solid rgba(100, 210, 255, 0.4);
+  color: color-mix(in srgb, var(--accent) 80%, white);
+}
+
+.view-awards-actions {
+  margin-top: 0.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
 /* —— Showdown slot (/showdownslot) —— 2×3 grid + prompt-generator lever */
 .showdown-slot-page {
   max-width: min(960px, 100%);

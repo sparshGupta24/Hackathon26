@@ -32,8 +32,9 @@ export function buildPeopleAwardWinnerPresentation(
 }
 
 /**
- * Ceremony resolution: unique vote leader wins automatically; ties need a stored confirmation
- * (same playerId/teamId as one of the tied leaders).
+ * Ceremony resolution:
+ * - Stored confirmation (e.g. from /view or vote admin) always wins for display, even if not a top vote-getter.
+ * - Otherwise: sole vote leader wins; ties with no confirmation stay pending.
  */
 export function resolvePeopleAwardForCeremony(
   teams: TeamState[],
@@ -46,19 +47,17 @@ export function resolvePeopleAwardForCeremony(
   awardPendingTieBreak: boolean;
 } {
   const leaders = topVoteRecipients(entries);
+
+  if (confirmation) {
+    const { winner, team } = buildPeopleAwardWinnerPresentation(confirmation, teams);
+    return { winner, team, leaders, awardPendingTieBreak: false };
+  }
+
   if (!leaders.length) {
     return { winner: null, team: null, leaders: [], awardPendingTieBreak: false };
   }
 
   const isTie = leaders.length > 1;
-  const matchesLeader = (p: { playerId: string; teamId: string }) =>
-    leaders.some((l) => l.playerId === p.playerId && l.teamId === p.teamId);
-
-  if (confirmation && matchesLeader(confirmation)) {
-    const { winner, team } = buildPeopleAwardWinnerPresentation(confirmation, teams);
-    return { winner, team, leaders, awardPendingTieBreak: false };
-  }
-
   if (!isTie) {
     const only = leaders[0]!;
     const { winner, team } = buildPeopleAwardWinnerPresentation(only, teams);
