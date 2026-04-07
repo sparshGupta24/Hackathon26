@@ -8,6 +8,8 @@ Volunteer-controlled Next.js event website with:
 - Circuit map modal on public + admin pages
 - Prompt generator slot machine
 
+Hey Sparsh
+
 ## Data layer
 
 Persistent state lives in **Google Cloud Firestore**, accessed from Next.js Route Handlers via the **Firebase Admin SDK**.
