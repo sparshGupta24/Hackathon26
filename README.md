@@ -8,7 +8,7 @@ Volunteer-controlled Next.js event website with:
 - Circuit map modal on public + admin pages
 - Prompt generator slot machine
 
-Hey Sparsh
+Hey Sparsh Hesadnlshfooifds
 
 ## Data layer
 
